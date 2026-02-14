@@ -1,28 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'core/theme.dart';
-import 'core/router.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Load environment variables
-  await dotenv.load(fileName: '.env');
-
-  // Initialize Supabase
-  await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL'] ?? '',
-    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-  );
-
-  runApp(
-    const ProviderScope(
-      child: ManifestApp(),
-    ),
-  );
+void main() {
+  runApp(const ClosetAIApp());
 }
 
 class ManifestApp extends StatelessWidget {
@@ -30,12 +9,23 @@ class ManifestApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Manifest',
-      theme: manifestLightTheme(),
-      darkTheme: manifestDarkTheme(),
-      themeMode: ThemeMode.dark, // Dark-first tactical aesthetic
-      routerConfig: manifestRouter,
+    return MaterialApp(
+      title: 'FitCheck',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6366F1), // Indigo
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6366F1),
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: const MainNavigationScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
