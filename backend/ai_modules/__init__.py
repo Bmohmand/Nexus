@@ -1,22 +1,22 @@
 """
-nexus_ai
-========
-The AI/ML pipeline for Nexus — The Physical World API.
+manifest_ai
+============
+The AI/ML pipeline for Manifest — AI search engine for physical assets.
 
-Quick start (for Zihan's FastAPI):
+Quick start:
 
-    from nexus_ai import NexusPipeline
+    from ai_modules import NexusPipeline
 
     pipeline = NexusPipeline()
 
     # Ingest an item
-    result = await pipeline.ingest("photo.jpg")
+    item_id = await pipeline.ingest("photo.jpg", image_url="https://...")
 
     # Search
-    query_vec = await pipeline.embed_query("cold weather survival gear")
+    plan = await pipeline.search("cold weather survival gear")
 
-    # Synthesize (after Supabase returns results)
-    plan = await pipeline.synthesize_results(query, retrieved_items)
+    # Pack (search + knapsack optimization)
+    result, plan = await pipeline.pack_and_explain("medical relief", "drone_delivery")
 
 Env vars needed:
     OPENAI_API_KEY, VOYAGE_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY

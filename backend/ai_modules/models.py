@@ -1,8 +1,7 @@
 """
-nexus_ai/models.py
+manifest/models.py
 ==================
-Shared data models used across all pipeline modules.
-These define the contract between your code and Zihan's backend.
+Shared data models used across all Manifest pipeline modules.
 """
 
 from pydantic import BaseModel, Field
@@ -26,6 +25,7 @@ class ItemContext(BaseModel):
     semantic_tags: list[str] = Field(default_factory=list, description="Freeform tags: ['first_aid', 'sterile', 'survival', 'cold-weather']")
     durability: Optional[str] = Field(default=None, description="'disposable', 'reusable', 'rugged'")
     compressibility: Optional[str] = Field(default=None, description="'highly_compressible', 'moderate', 'rigid'")
+    quantity: int = Field(default=1, description="Number of this item available (for consumables like bandages, batteries)")
 
 
 class EmbeddingResult(BaseModel):
@@ -41,7 +41,7 @@ class EmbeddingResult(BaseModel):
 
 
 class SearchQuery(BaseModel):
-    """Incoming search request from Noah's UI via Zihan's API."""
+    """Incoming search request from the Manifest UI."""
     query_text: str = Field(description="Natural language, e.g. '48-hour cold climate medical mission'")
     top_k: int = Field(default=15, ge=1, le=50)
     category_filter: Optional[str] = Field(default=None, description="Optional: restrict to one category")
@@ -57,7 +57,7 @@ class RetrievedItem(BaseModel):
 
 class MissionPlan(BaseModel):
     """
-    The final synthesized output — an AI-curated packing manifest
+    The final synthesized output — an AI-curated manifest
     with reasoning for each item selection.
     """
     mission_summary: str = Field(description="1-2 sentence interpretation of the user's mission")
