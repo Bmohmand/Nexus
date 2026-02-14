@@ -1,0 +1,22 @@
+# Nexus AI Pipeline — Requirements
+# Install: pip install -r requirements.txt
+
+# Core
+pydantic>=2.5.0
+openai>=1.12.0           # GPT-4o Vision + synthesis
+
+# Embedding Providers (install the one you're using)
+voyageai>=0.3.0           # Option A: Voyage multimodal-3 (recommended)
+# google-cloud-aiplatform>=1.38.0  # Option B: Vertex AI (uncomment if using)
+
+# Local CLIP fallback (for dev/offline)
+open-clip-torch>=2.24.0
+torch>=2.1.0
+torchvision>=0.16.0
+Pillow>=10.0.0
+
+# Async HTTP (for URL image fetching)
+httpx>=0.26.0
+
+# Utilities
+numpy>=1.24.0
