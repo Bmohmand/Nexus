@@ -48,9 +48,6 @@ class PackableItem:
     category: str = "misc"        # From AI context extraction
     semantic_tags: list[str] = field(default_factory=list)
 
-    # Optional: volume constraint (for future use)
-    volume_cm3: Optional[float] = None
-
 
 @dataclass
 class PackingConstraints:
@@ -64,6 +61,10 @@ class PackingConstraints:
     # "At least 2 medical items, at least 3 clothing items"
     category_minimums: dict[str, int] = field(default_factory=dict)
 
+    # Category maximums: {"tech": 2, "food": 5}
+    # "No more than 2 tech items" (prevents filling space with clutter)
+    category_maximums: dict[str, int] = field(default_factory=dict)
+
     # Tag diversity minimums: {"wound_care": 1, "warmth": 2, ...}
     # More granular than categories — uses the semantic_tags from AI extraction
     tag_minimums: dict[str, int] = field(default_factory=dict)
@@ -71,8 +72,8 @@ class PackingConstraints:
     # Max items of any single type (prevents 50 aspirins)
     max_per_item: Optional[int] = None  # None = use quantity_owned as limit
 
-    # Optional volume constraint
-    max_volume_cm3: Optional[float] = None
+    # Items that MUST be packed (by ID)
+    pinned_items: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -237,6 +238,13 @@ class KnapsackOptimizer:
                 )
             model.Add(sum(x[i] for i in indices) >= effective_min)
 
+        # ----- Constraint 2b: Category maximums -----
+        for cat, maximum in constraints.category_maximums.items():
+            indices = [i for i, item in enumerate(items) if item.category == cat]
+            if indices:
+                # No need to relax maximums; just enforce them
+                model.Add(sum(x[i] for i in indices) <= maximum)
+
         # ----- Constraint 3: Tag diversity minimums -----
         for tag, minimum in constraints.tag_minimums.items():
             indices = [
@@ -255,17 +263,13 @@ class KnapsackOptimizer:
                 )
             model.Add(sum(x[i] for i in indices) >= effective_min)
 
-        # ----- Constraint 4: Volume limit (optional) -----
-        if constraints.max_volume_cm3 is not None:
-            volumes = []
-            for item in items:
-                v = item.volume_cm3 if item.volume_cm3 else 0
-                volumes.append(int(v * SCALE))
-            scaled_max_vol = int(constraints.max_volume_cm3 * SCALE)
-            model.Add(
-                sum(x[i] * volumes[i] for i in range(len(items)))
-                <= scaled_max_vol
-            )
+        # ----- Constraint 5: Pinned items (Must Haves) -----
+        for pinned_id in constraints.pinned_items:
+            indices = [i for i, item in enumerate(items) if item.item_id == pinned_id]
+            if indices:
+                model.Add(sum(x[i] for i in indices) >= 1)
+            else:
+                relaxed.append(f"Pinned item {pinned_id} not found in candidates")
 
         # ----- Objective: Maximize total similarity score -----
         # Scale similarity scores to integers (multiply by 10000)
@@ -356,7 +360,7 @@ class KnapsackOptimizer:
                 weight_overrides.get(item.item_id, None)
                 if weight_overrides else None
             ) or estimate_weight(item)
-
+            
             qty = (
                 inventory.get(item.item_id, 1)
                 if inventory else 1
