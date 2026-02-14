@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants.dart';
 import '../providers/items_provider.dart';
 import '../providers/search_provider.dart';
+import '../services/api_client.dart';
 
 /// Ingest screen: capture or pick an image, upload to Supabase Storage,
 /// then send to the FastAPI pipeline for AI context extraction + embedding.
@@ -78,6 +80,13 @@ class _IngestScreenState extends ConsumerState<IngestScreen> {
         message =
             "Storage bucket '$kStorageBucketName' not found. Create it in Supabase: "
             "Dashboard → Storage → New bucket. Name: $kStorageBucketName. Set to Public.";
+      } else if (e is DioException &&
+          (e.type == DioExceptionType.connectionError ||
+              e.message?.contains('connection error') == true ||
+              e.message?.contains('XMLHttpRequest') == true)) {
+        message =
+            "Cannot reach the AI server. Start the FastAPI backend (e.g. uvicorn server.main:app --reload --port 8000 from the backend folder). "
+            "If it runs on another host/port, set API_BASE_URL in .env (e.g. API_BASE_URL=http://192.168.1.10:8000).";
       }
       setState(() {
         _error = message;

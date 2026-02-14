@@ -1,6 +1,12 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import '../core/constants.dart';
 import '../models/search_result.dart';
+
+/// Base URL for the FastAPI backend. Read from .env (API_BASE_URL) or default.
+String get apiBaseUrl =>
+    dotenv.env['API_BASE_URL']?.trim() ?? kApiBaseUrl;
 
 /// HTTP client for the Manifest FastAPI middleware.
 /// Handles AI operations: ingest, search, pack.
@@ -8,9 +14,10 @@ class ManifestApiClient {
   late final Dio _dio;
 
   ManifestApiClient() {
+    final base = apiBaseUrl;
     _dio = Dio(
       BaseOptions(
-        baseUrl: '$kApiBaseUrl/api/v1',
+        baseUrl: '$base/api/v1',
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 60), // AI calls can be slow
         headers: {'Content-Type': 'application/json'},
@@ -21,7 +28,7 @@ class ManifestApiClient {
   // ---- Health ----
   Future<bool> healthCheck() async {
     try {
-      final response = await Dio().get('$kApiBaseUrl/health');
+      final response = await Dio().get('$apiBaseUrl/health');
       return response.statusCode == 200;
     } catch (_) {
       return false;
