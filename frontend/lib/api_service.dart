@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-
 import 'core/constants.dart';
 
 class NexusApiService {
@@ -27,7 +26,7 @@ static Future<Map<String, dynamic>?> ingestImage({
   String? userId,
 }) async {
   try {
-    final uri = Uri.parse('$apiBaseUrl/api/v1/ingest');
+    final uri = Uri.parse('$backendUrl/api/v1/ingest');
     
     final response = await http.post(
       uri,
@@ -62,7 +61,7 @@ static Future<Map<String, dynamic>?> ingestImage({
     bool synthesize = false,
   }) async {
     try {
-      final uri = Uri.parse('$apiBaseUrl/api/v1/search');
+      final uri = Uri.parse('$backendUrl/api/v1/search');
       
       final response = await http.post(
         uri,
@@ -115,7 +114,7 @@ static Future<Map<String, dynamic>?> ingestImage({
       if (domain != null) params['domain'] = domain;
       if (userId != null) params['user_id'] = userId;
 
-      final uri = Uri.parse('$apiBaseUrl/api/v1/items')
+      final uri = Uri.parse('$backendUrl/api/v1/items')
           .replace(queryParameters: params);
 
       final response = await http.get(
@@ -194,7 +193,7 @@ static Future<Map<String, dynamic>?> ingestImage({
     Map<String, int>? categoryMinimums,
   }) async {
     try {
-      final uri = Uri.parse('$apiBaseUrl/api/v1/pack');
+      final uri = Uri.parse('$backendUrl/api/v1/pack');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
@@ -223,7 +222,7 @@ static Future<Map<String, dynamic>?> ingestImage({
   /// Health check - verify backend is running
   static Future<bool> healthCheck() async {
     try {
-      final uri = Uri.parse('$apiBaseUrl/health');
+      final uri = Uri.parse('$backendUrl/health');
       final response = await http.get(uri).timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (e) {
