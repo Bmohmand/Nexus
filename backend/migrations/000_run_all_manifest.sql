@@ -191,3 +191,8 @@ create policy "Allow updates to manifest-assets" on storage.objects for update t
 
 drop policy if exists "Allow deletes from manifest-assets" on storage.objects;
 create policy "Allow deletes from manifest-assets" on storage.objects for delete to public using (bucket_id = 'manifest-assets');
+
+-- ============================================================================
+-- 10. Allow nullable user_id (so ingest works without sending user_id)
+-- ============================================================================
+alter table manifest_items alter column user_id drop not null;
