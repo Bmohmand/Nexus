@@ -1541,7 +1541,7 @@ class _CameraIngestViewState extends State<CameraIngestView> {
         });
 
         if (result != null) {
-          _showSuccessDialog();
+          _showSuccessDialog(result);
         } else {
           _showErrorDialog('Failed to process image. Please try again.');
         }
@@ -1556,7 +1556,11 @@ class _CameraIngestViewState extends State<CameraIngestView> {
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog(Map<String, dynamic> result) {
+    final name = result['name'] as String? ?? 'Item';
+    final category = result['category'] as String? ?? '';
+    final activities = List<String>.from(result['activity_contexts'] ?? []);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1580,23 +1584,49 @@ class _CameraIngestViewState extends State<CameraIngestView> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Item Indexed!',
-              style: TextStyle(
+            Text(
+              '$name Indexed!',
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Vector embedding created and stored in Pinecone',
-              style: TextStyle(
+            Text(
+              'Categorized as $category',
+              style: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 14,
               ),
               textAlign: TextAlign.center,
             ),
+            if (activities.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.center,
+                children: activities.take(4).map((tag) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(16, 185, 129, 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      tag.replaceAll('_', ' '),
+                      style: const TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -2331,15 +2361,47 @@ class ItemDetailPage extends StatelessWidget {
                     _buildDetailRow('Weight Estimate', item['weight_estimate']),
                     _buildDetailRow('Thermal Rating', item['thermal_rating']),
                     _buildDetailRow('Water Resistance', item['water_resistance']),
+                    _buildDetailRow('Durability', item['durability']),
+                    _buildDetailRow('Compressibility', item['compressibility']),
                   ]),
-                  
+
                   const SizedBox(height: 24),
-                  
+
+                  if (item['environmental_suitability'] != null) ...[
+                    _buildDetailSection('Environment', [
+                      _buildUtilitySummary(item['environmental_suitability']),
+                    ]),
+                    const SizedBox(height: 24),
+                  ],
+
+                  if (item['limitations_and_failure_modes'] != null) ...[
+                    _buildDetailSection('Limitations', [
+                      _buildUtilitySummary(item['limitations_and_failure_modes']),
+                    ]),
+                    const SizedBox(height: 24),
+                  ],
+
+                  if (item['activity_contexts'] != null &&
+                      (item['activity_contexts'] as List).isNotEmpty) ...[
+                    _buildDetailSection('Suitable Activities', [
+                      _buildTagWrap(List<String>.from(item['activity_contexts']), const Color(0xFF10B981)),
+                    ]),
+                    const SizedBox(height: 24),
+                  ],
+
+                  if (item['unsuitable_contexts'] != null &&
+                      (item['unsuitable_contexts'] as List).isNotEmpty) ...[
+                    _buildDetailSection('Unsuitable For', [
+                      _buildTagWrap(List<String>.from(item['unsuitable_contexts']), const Color(0xFFEF4444)),
+                    ]),
+                    const SizedBox(height: 24),
+                  ],
+
                   if (item['medical_application'] != null)
                     _buildDetailSection('Medical', [
                       _buildDetailRow('Medical Application', item['medical_application']),
                     ]),
-                  
+
                   if (item['utility_summary'] != null) ...[
                     const SizedBox(height: 24),
                     _buildDetailSection('Utility Summary', [
@@ -2403,6 +2465,31 @@ class ItemDetailPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTagWrap(List<String> tags, Color color) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: tags.map((tag) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+          ),
+          child: Text(
+            tag.replaceAll('_', ' '),
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 

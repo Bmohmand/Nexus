@@ -28,6 +28,17 @@ class IngestResponse(BaseModel):
     category: str
     utility_summary: str
     semantic_tags: list[str]
+    # Enhanced context fields
+    primary_material: Optional[str] = None
+    weight_estimate: Optional[str] = None
+    thermal_rating: Optional[str] = None
+    water_resistance: Optional[str] = None
+    durability: Optional[str] = None
+    compressibility: Optional[str] = None
+    environmental_suitability: Optional[str] = None
+    limitations_and_failure_modes: Optional[str] = None
+    activity_contexts: list[str] = []
+    unsuitable_contexts: list[str] = []
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +133,17 @@ class ItemResponse(BaseModel):
     semantic_tags: list[str] = []
     weight_grams: Optional[float] = None
     created_at: Optional[str] = None
+    # Enhanced context fields
+    primary_material: Optional[str] = None
+    weight_estimate: Optional[str] = None
+    thermal_rating: Optional[str] = None
+    water_resistance: Optional[str] = None
+    durability: Optional[str] = None
+    compressibility: Optional[str] = None
+    environmental_suitability: Optional[str] = None
+    limitations_and_failure_modes: Optional[str] = None
+    activity_contexts: list[str] = []
+    unsuitable_contexts: list[str] = []
 
 
 class ItemListResponse(BaseModel):

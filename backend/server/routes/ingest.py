@@ -48,14 +48,7 @@ async def ingest_item(
             user_id=user_id,
         )
 
-        return IngestResponse(
-            item_id=item_id,
-            name=context.name,
-            domain=context.inferred_category,
-            category=context.inferred_category,
-            utility_summary=context.utility_summary,
-            semantic_tags=context.semantic_tags,
-        )
+        return _build_ingest_response(item_id, context)
 
     except Exception as e:
         logger.error(f"Ingest failed: {e}", exc_info=True)
@@ -84,15 +77,30 @@ async def ingest_upload(
             image_url="",  # No public URL for direct uploads
         )
 
-        return IngestResponse(
-            item_id=item_id,
-            name=context.name,
-            domain=context.inferred_category,
-            category=context.inferred_category,
-            utility_summary=context.utility_summary,
-            semantic_tags=context.semantic_tags,
-        )
+        return _build_ingest_response(item_id, context)
 
     except Exception as e:
         logger.error(f"Upload ingest failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Upload ingest failed: {str(e)}")
+
+
+def _build_ingest_response(item_id: str, context) -> IngestResponse:
+    """Build an IngestResponse with all enhanced context fields."""
+    return IngestResponse(
+        item_id=item_id,
+        name=context.name,
+        domain=context.inferred_category,
+        category=context.inferred_category,
+        utility_summary=context.utility_summary,
+        semantic_tags=context.semantic_tags,
+        primary_material=context.primary_material,
+        weight_estimate=context.weight_estimate,
+        thermal_rating=context.thermal_rating,
+        water_resistance=context.water_resistance,
+        durability=context.durability,
+        compressibility=context.compressibility,
+        environmental_suitability=context.environmental_suitability,
+        limitations_and_failure_modes=context.limitations_and_failure_modes,
+        activity_contexts=context.activity_contexts or [],
+        unsuitable_contexts=context.unsuitable_contexts or [],
+    )

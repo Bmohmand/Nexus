@@ -23,6 +23,33 @@ logger = logging.getLogger("manifest.routes.items")
 router = APIRouter()
 
 
+def _row_to_item_response(row: dict) -> ItemResponse:
+    """Convert a Supabase manifest_items row to an ItemResponse."""
+    return ItemResponse(
+        id=str(row["id"]),
+        name=row.get("name", ""),
+        image_url=row.get("image_url"),
+        domain=row.get("domain", "general"),
+        category=row.get("category"),
+        status=row.get("status", "available"),
+        quantity=row.get("quantity", 1),
+        utility_summary=row.get("utility_summary"),
+        semantic_tags=row.get("semantic_tags", []),
+        weight_grams=row.get("weight_grams"),
+        created_at=str(row.get("created_at", "")),
+        primary_material=row.get("primary_material"),
+        weight_estimate=row.get("weight_estimate"),
+        thermal_rating=row.get("thermal_rating"),
+        water_resistance=row.get("water_resistance"),
+        durability=row.get("durability"),
+        compressibility=row.get("compressibility"),
+        environmental_suitability=row.get("environmental_suitability"),
+        limitations_and_failure_modes=row.get("limitations_and_failure_modes"),
+        activity_contexts=row.get("activity_contexts", []),
+        unsuitable_contexts=row.get("unsuitable_contexts", []),
+    )
+
+
 @router.get("/items", response_model=ItemListResponse)
 async def list_items(
     domain: Optional[str] = Query(None, description="Filter by domain"),
@@ -48,21 +75,7 @@ async def list_items(
 
         response = query.execute()
 
-        items = []
-        for row in response.data:
-            items.append(ItemResponse(
-                id=str(row["id"]),
-                name=row.get("name", ""),
-                image_url=row.get("image_url"),
-                domain=row.get("domain", "general"),
-                category=row.get("category"),
-                status=row.get("status", "available"),
-                quantity=row.get("quantity", 1),
-                utility_summary=row.get("utility_summary"),
-                semantic_tags=row.get("semantic_tags", []),
-                weight_grams=row.get("weight_grams"),
-                created_at=str(row.get("created_at", "")),
-            ))
+        items = [_row_to_item_response(row) for row in response.data]
 
         return ItemListResponse(items=items, count=len(items))
 
@@ -91,21 +104,7 @@ async def get_item(
     """Get a single item by ID."""
     try:
         response = supabase.table("manifest_items").select("*").eq("id", item_id).single().execute()
-        row = response.data
-
-        return ItemResponse(
-            id=str(row["id"]),
-            name=row.get("name", ""),
-            image_url=row.get("image_url"),
-            domain=row.get("domain", "general"),
-            category=row.get("category"),
-            status=row.get("status", "available"),
-            quantity=row.get("quantity", 1),
-            utility_summary=row.get("utility_summary"),
-            semantic_tags=row.get("semantic_tags", []),
-            weight_grams=row.get("weight_grams"),
-            created_at=str(row.get("created_at", "")),
-        )
+        return _row_to_item_response(response.data)
 
     except Exception as e:
         logger.error(f"Get item failed: {e}", exc_info=True)
