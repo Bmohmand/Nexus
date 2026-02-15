@@ -1,8 +1,20 @@
 """
 Root-level conftest for backend tests.
 
-Adds the --run-live CLI flag for live integration tests.
+Loads .env for API keys and adds the --run-live CLI flag for live
+integration tests.
 """
+
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+
+    _env_path = Path(__file__).resolve().parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path, override=False)
+except ImportError:
+    pass  # python-dotenv not installed; rely on manually-exported env vars
 
 
 def pytest_addoption(parser):

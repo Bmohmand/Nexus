@@ -61,6 +61,17 @@ if "ai_modules" not in sys.modules:
     sys.modules["ai_modules"] = _pkg_mod
     # Do NOT exec the __init__.py — that's the whole point
 
+# Ensure .env is loaded before config reads os.getenv() at import time.
+# This is a safety belt — the backend/conftest.py should have already loaded it,
+# but this handles direct invocation from the embedding_tests/ directory.
+try:
+    from dotenv import load_dotenv
+    _dot_env = BACKEND_DIR / ".env"
+    if _dot_env.exists():
+        load_dotenv(_dot_env, override=False)
+except ImportError:
+    pass  # dotenv not installed; rely on manually-exported env vars
+
 # Pre-load lightweight modules that have no heavy deps
 config = load_module("config")
 models = load_module("models")

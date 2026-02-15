@@ -53,7 +53,11 @@ needs_supabase = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-TEST_IMAGES_DIR = Path(__file__).parent / "test_images"
+TEST_IMAGES_DIR = Path(__file__).resolve().parent.parent / "test_images"
+
+# Deterministic user ID for test isolation — all ingested rows use this so
+# cleanup can target them without touching real data.
+TEST_USER_ID = "00000000-0000-0000-0000-aaaa00000001"
 
 # Minimal 1x1 red PNG for when no real images are available
 TINY_PNG = (
@@ -337,6 +341,7 @@ class TestLiveFullRoundTrip:
         item_id, context = await pipeline.ingest(
             image_source=test_image_bytes,
             image_url="https://example.com/test-integration.jpg",
+            user_id=TEST_USER_ID,
         )
 
         assert item_id is not None
@@ -377,7 +382,9 @@ class TestLiveFullRoundTrip:
         try:
             # Ingest 1 item per category
             for cat, paths in categorized_images.items():
-                item_id, ctx = await pipeline.ingest(paths[0])
+                item_id, ctx = await pipeline.ingest(
+                    paths[0], user_id=TEST_USER_ID,
+                )
                 ingested_ids.append(item_id)
 
             # Search for medical items
