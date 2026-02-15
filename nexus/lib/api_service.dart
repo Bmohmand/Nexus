@@ -11,7 +11,7 @@ class NexusApiService {
       };
 
   // Your FastAPI backend URL - update this with your actual backend URL
-  static const String backendUrl = 'YOUR_FASTAPI_BACKEND_URL'; // TODO: Update this
+  static const String backendUrl = 'http://10.27.98.162:8000/api/v1'; // TODO: Update this
 
   /// Upload image to backend for ingestion
   /// POST /api/ingest

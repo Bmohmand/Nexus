@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'api_service.dart';
 
 void main() {
@@ -43,6 +45,169 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _testConnections(); // Test backend and Supabase on startup
+  }
+
+  /// Test both backend and Supabase connections
+  Future<void> _testConnections() async {
+    // Wait a moment for the UI to render
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Test Supabase
+    final supabaseOk = await NexusApiService.supabaseHealthCheck();
+    
+    // Test Backend (will fail if not configured yet, that's OK)
+    final backendOk = await NexusApiService.healthCheck();
+    
+    if (!mounted) return;
+    
+    // Show status
+    String message = '';
+    Color color = const Color(0xFF10B981);
+    
+    if (supabaseOk && backendOk) {
+      message = '✅ Connected: Supabase & Backend';
+      color = const Color(0xFF10B981); // Green
+    } else if (supabaseOk && !backendOk) {
+      message = '⚠️ Supabase: ✅ | Backend: ❌ (Update URL in api_service.dart)';
+      color = const Color(0xFFF59E0B); // Orange
+    } else if (!supabaseOk && backendOk) {
+      message = '⚠️ Supabase: ❌ | Backend: ✅';
+      color = const Color(0xFFF59E0B); // Orange
+    } else {
+      message = '❌ Not Connected: Check configuration';
+      color = const Color(0xFFEF4444); // Red
+    }
+    
+    // Show snackbar with status
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
+  }
+
+  /// Show detailed connection status
+  void _showConnectionStatus() async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    // Test connections
+    final supabaseOk = await NexusApiService.supabaseHealthCheck();
+    final backendOk = await NexusApiService.healthCheck();
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close loading
+
+    // Show results
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_tethering, color: Color(0xFF6366F1)),
+            SizedBox(width: 12),
+            Text('Connection Status', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStatusRow('Supabase Database', supabaseOk),
+            const SizedBox(height: 12),
+            _buildStatusRow('FastAPI Backend', backendOk),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF334155),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Configuration',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Supabase: ${supabaseOk ? "Connected" : "Check credentials"}',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Backend: ${backendOk ? "Connected" : "Update URL in api_service.dart"}',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          if (!backendOk || !supabaseOk)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _testConnections();
+              },
+              child: const Text('Retry'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(String label, bool isConnected) {
+    return Row(
+      children: [
+        Icon(
+          isConnected ? Icons.check_circle : Icons.cancel,
+          color: isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+        ),
+        Text(
+          isConnected ? 'Online' : 'Offline',
+          style: TextStyle(
+            color: isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -121,7 +286,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               const Spacer(),
               IconButton(
-                onPressed: () {},
+                onPressed: _showConnectionStatus,
                 icon: const Icon(Icons.settings_outlined, color: Color(0xFF94A3B8)),
               ),
             ],
@@ -653,6 +818,7 @@ class CameraIngestView extends StatefulWidget {
 
 class _CameraIngestViewState extends State<CameraIngestView> {
   bool _isProcessing = false;
+  String? _selectedImagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -674,7 +840,9 @@ class _CameraIngestViewState extends State<CameraIngestView> {
             ),
             child: _isProcessing
                 ? _buildProcessingState()
-                : _buildCameraPlaceholder(),
+                : (_selectedImagePath != null
+                    ? _buildImagePreview()
+                    : _buildCameraPlaceholder()),
           ),
           const SizedBox(height: 24),
           const Text(
@@ -854,93 +1022,116 @@ class _CameraIngestViewState extends State<CameraIngestView> {
     );
   }
 
-  void _captureImage() async {
-    // TODO: Integrate camera package
-    // For now, this is a placeholder for camera integration
-    // Uncomment when camera package is added to pubspec.yaml
-    
-    /*
-    final cameras = await availableCameras();
-    final firstCamera = cameras.first;
-    
-    final image = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TakePictureScreen(camera: firstCamera),
-      ),
-    );
-    
-    if (image != null) {
-      await _processAndIngestImage(image.path);
-    }
-    */
-    
-    // Temporary: Show dialog to explain camera integration is pending
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
-          'Camera Integration',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Camera capture requires the camera package.\n\n'
-          'To enable:\n'
-          '1. Add "camera: ^0.10.5" to pubspec.yaml\n'
-          '2. Implement camera capture screen\n'
-          '3. Test on physical device',
-          style: TextStyle(color: Color(0xFF94A3B8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+  Widget _buildImagePreview() {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Image.file(
+            File(_selectedImagePath!),
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
           ),
-        ],
-      ),
+        ),
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _selectedImagePath = null;
+                });
+              },
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 12,
+          left: 12,
+          right: 12,
+          child: ElevatedButton(
+            onPressed: () => _processAndIngestImage(_selectedImagePath!),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.upload),
+                SizedBox(width: 8),
+                Text(
+                  'Process & Upload',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  void _pickFromGallery() async {
-    // TODO: Integrate image_picker package
-    // For now, this is a placeholder for image picker integration
-    // Uncomment when image_picker package is added to pubspec.yaml
-    
-    /*
+  void _captureImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     
-    if (image != null) {
-      await _processAndIngestImage(image.path);
+    try {
+      // Capture image from camera
+      final XFile? photo = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (photo != null) {
+        setState(() {
+          _selectedImagePath = photo.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('Camera error: $e');
+      }
     }
-    */
+  }
+
+  void _pickFromGallery() async {
+    final ImagePicker picker = ImagePicker();
     
-    // Temporary: Show dialog to explain image picker integration is pending
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
-          'Image Picker Integration',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Gallery picker requires the image_picker package.\n\n'
-          'To enable:\n'
-          '1. Add "image_picker: ^1.0.4" to pubspec.yaml\n'
-          '2. Configure platform permissions\n'
-          '3. Test image selection',
-          style: TextStyle(color: Color(0xFF94A3B8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    try {
+      // Pick image from gallery
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedImagePath = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('Gallery error: $e');
+      }
+    }
   }
 
   /// Process and ingest image to backend
@@ -959,6 +1150,7 @@ class _CameraIngestViewState extends State<CameraIngestView> {
       if (mounted) {
         setState(() {
           _isProcessing = false;
+          _selectedImagePath = null; // Clear preview after upload
         });
 
         if (result != null) {
@@ -1053,7 +1245,6 @@ class _CameraIngestViewState extends State<CameraIngestView> {
     );
       }
     }
-  
 
 
 // Graph Visualization View
