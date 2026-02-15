@@ -32,16 +32,12 @@ async def ingest_item(
     try:
         logger.info(f"Ingesting item from URL: {request.image_url[:80]}...")
 
-        # Run the full pipeline
-        item_id = await pipeline.ingest(
+        # Run the full pipeline (extract + embed + upsert)
+        item_id, context = await pipeline.ingest(
             image_source=request.image_url,
             image_url=request.image_url,
+            user_id=request.user_id,
         )
-
-        # Retrieve the stored context to return to the client
-        # The pipeline stores context during ingest, so we can re-extract
-        # from the last extraction. For now, run a quick extraction.
-        context = await pipeline.extractor.extract(request.image_url)
 
         return IngestResponse(
             item_id=item_id,
@@ -74,12 +70,10 @@ async def ingest_upload(
         image_bytes = await file.read()
         logger.info(f"Ingesting uploaded file: {file.filename} ({len(image_bytes)} bytes)")
 
-        item_id = await pipeline.ingest(
+        item_id, context = await pipeline.ingest(
             image_source=image_bytes,
             image_url="",  # No public URL for direct uploads
         )
-
-        context = await pipeline.extractor.extract(image_bytes)
 
         return IngestResponse(
             item_id=item_id,

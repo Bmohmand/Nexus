@@ -74,16 +74,22 @@ class NexusPipeline:
     # -------------------------------------------------------------------
     # FLOW 1: INGEST  --  Called by Zihan's POST /api/ingest
     # -------------------------------------------------------------------
-    async def ingest(self, image_source: str | bytes, image_url: str = "") -> str:
+    async def ingest(
+        self,
+        image_source: str | bytes,
+        image_url: str = "",
+        user_id: Optional[str] = None,
+    ) -> str:
         """
         Full ingest pipeline: image -> context -> embedding -> store in Supabase.
 
         Args:
             image_source: File path, URL, or raw bytes of the image.
             image_url: The public S3/R2 URL after Zihan uploads the image.
+            user_id: Optional owner user UUID (for multi-tenant; if omitted, DB must allow null).
 
         Returns:
-            The item's UUID (stored in Supabase).
+            Tuple of (item_id, context) for the API response.
         """
         t0 = time.time()
 
@@ -108,11 +114,11 @@ class NexusPipeline:
 
         # Step 3: Upsert into Supabase
         logger.info("Step 3/3: Upserting into Supabase...")
-        item_id = await self.store.upsert(result, image_url=image_url)
+        item_id = await self.store.upsert(result, image_url=image_url, user_id=user_id)
         t3 = time.time()
 
         logger.info(f"Ingest complete in {t3 - t0:.1f}s | id={item_id}")
-        return item_id
+        return item_id, context
 
     async def ingest_batch(self, image_sources: list[tuple[str | bytes, str]]) -> list[str]:
         """
@@ -130,7 +136,7 @@ class NexusPipeline:
         for i, (src, url) in enumerate(image_sources):
             logger.info(f"Batch ingest [{i + 1}/{len(image_sources)}]")
             try:
-                item_id = await self.ingest(src, image_url=url)
+                item_id, _ = await self.ingest(src, image_url=url)
                 ids.append(item_id)
             except Exception as e:
                 logger.error(f"Failed to ingest item {i + 1}: {e}")

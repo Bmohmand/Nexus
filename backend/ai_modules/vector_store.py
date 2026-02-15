@@ -44,13 +44,19 @@ class SupabaseVectorStore:
         self.client = create_client(url, key)
         logger.info("Supabase vector store initialized (table: %s)", TABLE_NAME)
 
-    async def upsert(self, result: EmbeddingResult, image_url: str = "") -> str:
+    async def upsert(
+        self,
+        result: EmbeddingResult,
+        image_url: str = "",
+        user_id: Optional[str] = None,
+    ) -> str:
         """
         Insert or update an item in the manifest_items table.
 
         Args:
             result: EmbeddingResult from pipeline.ingest()
             image_url: Public URL after uploading the image
+            user_id: Optional owner user UUID (required if table has user_id NOT NULL)
 
         Returns:
             The item's UUID
@@ -73,6 +79,8 @@ class SupabaseVectorStore:
             "durability": ctx.durability,
             "compressibility": ctx.compressibility,
         }
+        if user_id:
+            row["user_id"] = user_id
 
         self.client.table(TABLE_NAME).upsert(row).execute()
         logger.info(f"Upserted item: {ctx.name} ({result.item_id})")
