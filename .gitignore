@@ -1,0 +1,28 @@
+# VS Code specific files.
+# Keep launch.json, tasks.json, and extensions.json if they are shared team configurations.
+.vscode/*
+!/.vscode/launch.json # Un-ignore shared launch configurations
+!/.vscode/tasks.json # Un-ignore shared task definitions
+!/.vscode/extensions.json # Un-ignore recommended extensions
+
+# Miscellaneous global ignores
+*.bak
+*.orig
+*.rej
+*.zip
+*.tar
+*.gz
+*.rar
+*.tmp
+*~
+Thumbs.db
+
+# Environment variables and sensitive files
+.env
+.env.*
+*.env
+secrets.yaml
+config.local.yaml # Local configuration files
+
+# Flutter Version Management (if used at the root level for the entire project)
+.fvm/
