@@ -128,7 +128,7 @@ class NexusApiService {
   /// Health check - verify backend is running
   static Future<bool> healthCheck() async {
     try {
-      final uri = Uri.parse('$backendUrl/health');
+      final uri = Uri.parse('http://10.27.98.162:8000/health');
       final response = await http.get(uri).timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (e) {
