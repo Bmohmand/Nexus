@@ -11,7 +11,14 @@ Or from the backend/ directory:
 """
 
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
+
+# Load backend/.env before any component reads os.environ
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_path)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

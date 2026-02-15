@@ -23,10 +23,12 @@ class EmbeddingProvider(str, Enum):
 # ---------------------------------------------------------------------------
 # API Keys (loaded from environment)
 # ---------------------------------------------------------------------------
-OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+# Accept common alternate names (e.g. frontend uses OPEN_AI_KEY, backend uses OPENAI_API_KEY)
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY") or os.getenv("OPEN_AI_KEY") or ""
 VOYAGE_API_KEY: str = os.getenv("VOYAGE_API_KEY", "")
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+# Service role key required for server-side DB/vector writes; anon key can be used for dev but may hit RLS
+SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY") or ""
 
 # ---------------------------------------------------------------------------
 # Model Configuration

@@ -32,12 +32,20 @@ pip install pydantic openai supabase fastapi "uvicorn[standard]" python-multipar
 
 ## 3. Set environment variables
 
-Copy `server/.env.example` to `.env` in `backend` (or set in your shell) and fill in:
+The server loads **`backend/.env`** at startup. Create it from the example:
 
-- `OPENAI_API_KEY`
-- `VOYAGE_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_KEY`
+```powershell
+copy .env.example .env
+```
+
+Then edit `backend/.env` and set:
+
+- **OPENAI_API_KEY** — from OpenAI
+- **VOYAGE_API_KEY** — from Voyage AI
+- **SUPABASE_URL** — from Supabase Dashboard → Project Settings → API
+- **SUPABASE_SERVICE_KEY** — use the **service_role** key (secret), not the anon key
+
+(You can copy SUPABASE_URL from the frontend `.env`; the backend needs the **service_role** key for database/vector writes.)
 
 ## 4. Run the API server
 

@@ -2,6 +2,7 @@
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.6       # For file uploads
+python-dotenv>=1.0.0         # Load .env from backend/
 
 # Inherit ai_modules deps (install both requirement files)
 # pip install -r ai_modules/requirements.txt -r server/requirements.txt
