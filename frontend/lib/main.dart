@@ -1049,12 +1049,21 @@ class _ItemsGridViewState extends State<ItemsGridView> {
     );
   }
 
-  Widget _buildItemCard(Map<String, dynamic> item) {
-    final imageUrl = item['image_url'] as String?;
-    final name = item['name'] as String? ?? 'Unknown Item';
-    final category = item['category'] as String? ?? 'misc';
+ Widget _buildItemCard(Map<String, dynamic> item) {
+  final imageUrl = item['image_url'] as String?;
+  final name = item['name'] as String? ?? 'Unknown Item';
+  final category = item['category'] as String? ?? 'misc';
 
-    return Container(
+  return GestureDetector(  // ADD THIS
+    onTap: () {  // ADD THIS
+      Navigator.push(  // ADD THIS
+        context,  // ADD THIS
+        MaterialPageRoute(  // ADD THIS
+          builder: (context) => ItemDetailPage(item: item),  // ADD THIS
+        ),  // ADD THIS
+      );  // ADD THIS
+    },  // ADD THIS
+    child: Container(  // CHANGE: was just "Container(" before
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(16),
@@ -1156,7 +1165,8 @@ class _ItemsGridViewState extends State<ItemsGridView> {
           ),
         ],
       ),
-    );
+    )
+  );
   }
 
   IconData _getCategoryIcon(String category) {
@@ -2215,6 +2225,203 @@ class _ContainersViewState extends State<ContainersView> {
                     ),
         ),
       ],
+    );
+  }
+}
+
+// NEW: Item Detail Page - Add this at the bottom of main.dart
+class ItemDetailPage extends StatelessWidget {
+  final Map<String, dynamic> item;
+
+  const ItemDetailPage({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = item['image_url'] as String?;
+    final name = item['name'] as String? ?? 'Unknown Item';
+    final category = item['category'] as String? ?? item['domain'] as String? ?? 'Uncategorized';
+    
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Item Details',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            if (imageUrl != null && imageUrl.isNotEmpty)
+              Container(
+                width: double.infinity,
+                height: 300,
+                color: const Color(0xFF334155),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        size: 64,
+                        color: Color(0xFF64748B),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Category Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(99, 102, 241, 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF6366F1)),
+                    ),
+                    child: Text(
+                      category,
+                      style: const TextStyle(
+                        color: Color(0xFF6366F1),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  const Divider(color: Color(0xFF334155)),
+                  const SizedBox(height: 24),
+                  
+                  // Details Grid
+                  _buildDetailSection('Overview', [
+                    _buildDetailRow('Domain', item['domain']),
+                    _buildDetailRow('Status', item['status']),
+                    _buildDetailRow('Quantity', item['quantity']),
+                  ]),
+                  
+                  const SizedBox(height: 24),
+                  
+                  _buildDetailSection('Specifications', [
+                    _buildDetailRow('Primary Material', item['primary_material']),
+                    _buildDetailRow('Weight Estimate', item['weight_estimate']),
+                    _buildDetailRow('Thermal Rating', item['thermal_rating']),
+                    _buildDetailRow('Water Resistance', item['water_resistance']),
+                  ]),
+                  
+                  const SizedBox(height: 24),
+                  
+                  if (item['medical_application'] != null)
+                    _buildDetailSection('Medical', [
+                      _buildDetailRow('Medical Application', item['medical_application']),
+                    ]),
+                  
+                  if (item['utility_summary'] != null) ...[
+                    const SizedBox(height: 24),
+                    _buildDetailSection('Utility Summary', [
+                      _buildUtilitySummary(item['utility_summary']),
+                    ]),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(String label, dynamic value) {
+    if (value == null || value.toString().isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUtilitySummary(dynamic summary) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Text(
+        summary.toString(),
+        style: const TextStyle(
+          color: Color(0xFFE2E8F0),
+          fontSize: 14,
+          height: 1.5,
+        ),
+      ),
     );
   }
 }
