@@ -337,6 +337,7 @@ static Future<Map<String, dynamic>?> ingestImage({
     required String query,
     required List<String> containerIds,
     int topK = 30,
+    bool explain = false,
   }) async {
     try {
       final response = await http.post(
@@ -346,6 +347,7 @@ static Future<Map<String, dynamic>?> ingestImage({
           'query': query,
           'container_ids': containerIds,
           'top_k': topK,
+          'explain': explain,
         }),
       );
       if (response.statusCode == 200) {
