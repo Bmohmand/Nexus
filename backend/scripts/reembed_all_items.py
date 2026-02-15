@@ -32,9 +32,14 @@ import logging
 import sys
 import time
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Allow running from repo root: `python scripts/reembed_all_items.py`
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
+backend_path = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_path))
+
+# Load environment variables
+load_dotenv(backend_path / ".env")
 
 from ai_modules.config import SUPABASE_URL, SUPABASE_SERVICE_KEY
 from ai_modules.context_extractor import ContextExtractor
