@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/constants.dart';
 import 'models/search_result.dart';
+import 'models/vault_item.dart';
 import 'supabase_config.dart';
 
 /// API service for Nexus: FastAPI backend (ingest, search, health) and Supabase (items).
@@ -55,6 +56,44 @@ class NexusApiService {
     } catch (e) {
       print('Exception during search: $e');
       return null;
+    }
+  }
+
+  /// List items from manifest (GET /api/v1/items). Returns items uploaded via ingest.
+  static Future<List<VaultItem>> fetchManifestItems({
+    String? domain,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{
+        'limit': limit,
+        'offset': offset,
+        if (domain != null) 'domain': domain,
+      };
+      final response = await _backend.get('/items', queryParameters: queryParams);
+      final data = response.data as Map<String, dynamic>?;
+      if (data == null) return [];
+      final list = data['items'] as List<dynamic>? ?? [];
+      return list
+          .map((e) => VaultItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Exception fetching manifest items: $e');
+      rethrow;
+    }
+  }
+
+  /// Total item count (GET /api/v1/items/count).
+  static Future<int> fetchItemsCount() async {
+    try {
+      final response = await _backend.get('/items/count');
+      final data = response.data as Map<String, dynamic>?;
+      if (data == null) return 0;
+      return (data['count'] as num?)?.toInt() ?? 0;
+    } catch (e) {
+      print('Exception fetching items count: $e');
+      return 0;
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'api_service.dart';
 import 'models/search_result.dart';
+import 'models/vault_item.dart';
 import 'storage_service.dart';
 import 'supabase_config.dart';
 
@@ -84,6 +85,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
+  int _itemsRefreshKey = 0;
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
@@ -113,10 +115,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             Expanded(
               child: IndexedStack(
                 index: _selectedIndex,
-                children: const [
-                  ItemsGridView(),
-                  CameraIngestView(),
-                  GraphVisualizationView(),
+                children: [
+                  ItemsGridView(key: ValueKey(_itemsRefreshKey)),
+                  const CameraIngestView(),
+                  const GraphVisualizationView(),
                 ],
               ),
             ),
@@ -278,6 +280,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
+            if (index == 0) _itemsRefreshKey++;
           });
         },
         backgroundColor: Colors.transparent,
@@ -479,9 +482,47 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
 
-// Items Grid View
-class ItemsGridView extends StatelessWidget {
+// Items Grid View — loads real items from GET /api/v1/items, refetches when tab is selected.
+class ItemsGridView extends StatefulWidget {
   const ItemsGridView({super.key});
+
+  @override
+  State<ItemsGridView> createState() => _ItemsGridViewState();
+}
+
+class _ItemsGridViewState extends State<ItemsGridView> {
+  List<VaultItem> _items = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final items = await NexusApiService.fetchManifestItems(limit: 100);
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -492,10 +533,10 @@ class ItemsGridView extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Your Collection',
                     style: TextStyle(
                       fontSize: 20,
@@ -503,10 +544,12 @@ class ItemsGridView extends StatelessWidget {
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    '48 items indexed',
-                    style: TextStyle(
+                    _loading
+                        ? 'Loading...'
+                        : '${_items.length} items indexed',
+                    style: const TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 14,
                     ),
@@ -534,23 +577,85 @@ class ItemsGridView extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: _buildItemsGrid(),
+          child: _buildContent(),
         ),
       ],
     );
   }
 
-  Widget _buildItemsGrid() {
-    // Sample data - replace with actual API data
-    final items = List.generate(
-      12,
-      (index) => {
-        'name': _getItemName(index),
-        'category': _getCategory(index),
-        'similarity': (85 + (index * 2)) % 100,
-      },
-    );
-
+  Widget _buildContent() {
+    if (_loading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Color(0xFF6366F1)),
+            SizedBox(height: 16),
+            Text(
+              'Loading your collection...',
+              style: TextStyle(color: Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
+              const SizedBox(height: 16),
+              const Text(
+                "Couldn't load items",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _loadItems,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_items.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[600]),
+              const SizedBox(height: 16),
+              const Text(
+                'No items yet.',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Use Scan to add your first item.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF94A3B8)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return GridView.builder(
       padding: const EdgeInsets.all(20),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -559,15 +664,13 @@ class ItemsGridView extends StatelessWidget {
         mainAxisSpacing: 16,
         childAspectRatio: 0.85,
       ),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return _buildItemCard(item);
-      },
+      itemCount: _items.length,
+      itemBuilder: (context, index) => _buildItemCard(_items[index]),
     );
   }
 
-  Widget _buildItemCard(Map<String, dynamic> item) {
+  Widget _buildItemCard(VaultItem item) {
+    final categoryLabel = item.category ?? item.domain;
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
@@ -589,13 +692,33 @@ class ItemsGridView extends StatelessWidget {
                   topRight: Radius.circular(16),
                 ),
               ),
-              child: Center(
-                child: Icon(
-                  _getCategoryIcon(item['category'] as String),
-                  size: 48,
-                  color: const Color(0xFF6366F1),
-                ),
-              ),
+              child: item.imageUrl != null && item.imageUrl!.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                      ),
+                      child: Image.network(
+                        item.imageUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Icon(
+                            _getCategoryIcon(categoryLabel),
+                            size: 48,
+                            color: const Color(0xFF6366F1),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Icon(
+                        _getCategoryIcon(categoryLabel),
+                        size: 48,
+                        color: const Color(0xFF6366F1),
+                      ),
+                    ),
             ),
           ),
           Padding(
@@ -604,7 +727,7 @@ class ItemsGridView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item['name'] as String,
+                  item.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -619,11 +742,11 @@ class ItemsGridView extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color.fromRGBO(255, 99, 102, 0.2),
+                        color: const Color.fromRGBO(99, 102, 241, 0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        item['category'] as String,
+                        categoryLabel,
                         style: const TextStyle(
                           color: Color(0xFF6366F1),
                           fontSize: 10,
@@ -641,50 +764,19 @@ class ItemsGridView extends StatelessWidget {
     );
   }
 
-  String _getItemName(int index) {
-    final names = [
-      'Wool Trench Coat',
-      'First Aid Kit',
-      'LED Flashlight',
-      'Thermal Blanket',
-      'Gore-Tex Jacket',
-      'Antibiotics',
-      'Camp Stove',
-      'Water Filter',
-      'Trauma Kit',
-      'Sleeping Bag',
-      'Gauze Pack',
-      'Multi-tool',
-    ];
-    return names[index % names.length];
-  }
-
-  String _getCategory(int index) {
-    final categories = [
-      'Clothing',
-      'Medical',
-      'Survival',
-      'Medical',
-      'Clothing',
-      'Medical',
-      'Survival',
-      'Survival',
-      'Medical',
-      'Survival',
-      'Medical',
-      'Survival',
-    ];
-    return categories[index % categories.length];
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Clothing':
+  static IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'clothing':
         return Icons.checkroom;
-      case 'Medical':
+      case 'medical':
         return Icons.medical_services_outlined;
-      case 'Survival':
+      case 'survival':
+      case 'camping':
         return Icons.outdoor_grill_outlined;
+      case 'tech':
+        return Icons.devices;
+      case 'food':
+        return Icons.restaurant;
       default:
         return Icons.category;
     }
