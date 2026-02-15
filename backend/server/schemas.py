@@ -82,6 +82,7 @@ class PackRequest(BaseModel):
     top_k: int = Field(default=30, ge=1, le=100)
     category_filter: Optional[str] = None
     user_id: Optional[str] = None
+    explain: bool = Field(default=False, description="If true, run LLM synthesis for mission summary and warnings")
 
 
 class PackedItem(BaseModel):
@@ -196,6 +197,7 @@ class MultiPackRequest(BaseModel):
     top_k: int = Field(default=30, ge=1, le=100)
     category_filter: Optional[str] = None
     user_id: Optional[str] = None
+    explain: bool = Field(default=False, description="If true, run LLM synthesis for mission summary and warnings")
 
 
 class ContainerPackedItems(BaseModel):

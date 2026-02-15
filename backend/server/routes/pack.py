@@ -55,12 +55,23 @@ async def pack_mission(
         else:
             constraints = _to_packing_constraints(request.constraints)
 
-        # Run optimization + LLM explanation
-        packing_result, plan = await pipeline.pack_and_explain(
-            query=request.query,
-            constraints=constraints,
-            top_k=request.top_k,
-        )
+        # Run optimization, optionally with LLM explanation
+        mission_summary = None
+        warnings = []
+        if request.explain:
+            packing_result, plan = await pipeline.pack_and_explain(
+                query=request.query,
+                constraints=constraints,
+                top_k=request.top_k,
+            )
+            mission_summary = plan.mission_summary
+            warnings = plan.warnings
+        else:
+            packing_result = await pipeline.pack(
+                query=request.query,
+                constraints=constraints,
+                top_k=request.top_k,
+            )
 
         # Build response
         packed_items = []
@@ -83,8 +94,8 @@ async def pack_mission(
             weight_utilization=packing_result.weight_utilization,
             solver_time_ms=packing_result.solver_time_ms,
             relaxed_constraints=packing_result.relaxed_constraints,
-            mission_summary=plan.mission_summary,
-            warnings=plan.warnings,
+            mission_summary=mission_summary,
+            warnings=warnings,
         )
 
     except ValueError as e:
@@ -149,13 +160,26 @@ async def pack_multi_container(
             diversity_constraints = _to_packing_constraints(request.constraints)
 
         # 4. Run the multi-container pack pipeline
-        result, plan = await pipeline.pack_multi_and_explain(
-            query=request.query,
-            container_specs=container_specs,
-            diversity_constraints=diversity_constraints,
-            top_k=request.top_k,
-            category_filter=request.category_filter,
-        )
+        mission_summary = None
+        warnings = []
+        if request.explain:
+            result, plan = await pipeline.pack_multi_and_explain(
+                query=request.query,
+                container_specs=container_specs,
+                diversity_constraints=diversity_constraints,
+                top_k=request.top_k,
+                category_filter=request.category_filter,
+            )
+            mission_summary = plan.mission_summary
+            warnings = plan.warnings
+        else:
+            result = await pipeline.pack_multi(
+                query=request.query,
+                container_specs=container_specs,
+                diversity_constraints=diversity_constraints,
+                top_k=request.top_k,
+                category_filter=request.category_filter,
+            )
 
         # 5. Build response
         container_results = []
@@ -201,8 +225,8 @@ async def pack_multi_container(
             solver_time_ms=result.solver_time_ms,
             relaxed_constraints=result.relaxed_constraints,
             unpacked_items=unpacked,
-            mission_summary=plan.mission_summary,
-            warnings=plan.warnings,
+            mission_summary=mission_summary,
+            warnings=warnings,
         )
 
     except HTTPException:
