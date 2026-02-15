@@ -23,12 +23,16 @@ import sys
 import json
 import numpy as np
 from pathlib import Path
+import pytest
 from collections import defaultdict
+import matplotlib
+# Force headless backend to avoid Tcl/Tk errors
+matplotlib.use("Agg")
 
 # ---------------------------------------------------------------------------
 # CONFIG
 # ---------------------------------------------------------------------------
-IMAGE_DIR = Path("test_images")
+IMAGE_DIR = Path(__file__).parent / "test_images"
 CATEGORIES = ["clothing", "medical", "tech", "camping"]
 
 # OPTIMIZATION: Switch to True for higher accuracy (uses ~1GB more RAM)
@@ -80,7 +84,7 @@ def load_clip_model():
     except ImportError:
         print("ERROR: Install deps with:")
         print("  pip install torch torchvision open-clip-torch Pillow scikit-learn matplotlib")
-        sys.exit(1)
+        pytest.skip("Missing dependencies (open_clip, torch, etc.)")
 
 
 def embed_images(model, preprocess, image_dir: Path):
@@ -131,6 +135,78 @@ def cosine_sim(a, b):
 
 
 # ---------------------------------------------------------------------------
+# PYTEST FIXTURES
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def model_bundle():
+    """Load CLIP model once for the module."""
+    return load_clip_model()
+
+@pytest.fixture(scope="module")
+def model(model_bundle):
+    return model_bundle[0]
+
+@pytest.fixture(scope="module")
+def preprocess(model_bundle):
+    return model_bundle[1]
+
+@pytest.fixture(scope="module")
+def tokenizer(model_bundle):
+    return model_bundle[2]
+
+@pytest.fixture(scope="module")
+def loaded_data(model, preprocess, tokenizer):
+    """Load images or generate synthetic data for tests."""
+    # Check if test images exist
+    has_images = IMAGE_DIR.exists() and any(
+        (IMAGE_DIR / cat).exists() and list((IMAGE_DIR / cat).iterdir())
+        for cat in CATEGORIES
+        if (IMAGE_DIR / cat).exists()
+    )
+
+    if has_images:
+        embeddings, labels = embed_images(model, preprocess, IMAGE_DIR)
+        if len(embeddings) >= 4:
+            return embeddings, labels
+
+    # Fallback: Generate synthetic data
+    print("[WARN] Using synthetic data for tests (no images found)")
+    import torch
+    # Use a subset of the synthetic generator logic
+    items = {
+        "clothing": ["heavy wool winter coat", "lightweight cotton t-shirt"],
+        "medical": ["sterile trauma bandage", "emergency thermal blanket"],
+        "tech": ["tactical flashlight", "portable solar panel"],
+        "camping": ["4-season sleeping bag", "water filtration pump"],
+    }
+    paths, texts, lbls = [], [], []
+    for cat, descs in items.items():
+        for i, desc in enumerate(descs):
+            paths.append(f"synthetic_{cat}_{i}")
+            texts.append(desc)
+            lbls.append(cat)
+    
+    tokens = tokenizer(texts)
+    with torch.no_grad():
+        vecs = model.encode_text(tokens)
+        vecs = vecs / vecs.norm(dim=-1, keepdim=True)
+    
+    embeddings = {p: v.numpy() for p, v in zip(paths, vecs)}
+    labels = {p: l for p, l in zip(paths, lbls)}
+    return embeddings, labels
+
+@pytest.fixture(scope="module")
+def embeddings(loaded_data): return loaded_data[0]
+
+@pytest.fixture(scope="module")
+def labels(loaded_data): return loaded_data[1]
+
+@pytest.fixture(scope="module")
+def text_vecs(model, tokenizer):
+    return embed_text_queries(model, tokenizer, CROSS_DOMAIN_QUERIES)
+
+
+# ---------------------------------------------------------------------------
 # TEST 1: Intra-category vs Inter-category similarity
 # ---------------------------------------------------------------------------
 def test_clustering(embeddings, labels):
@@ -175,7 +251,7 @@ def test_clustering(embeddings, labels):
     verdict = "PASS" if gap > 0.03 else "WEAK" if gap > 0 else "FAIL"
     print(f"\n  Separation gap: {gap:.4f}  [{verdict}]")
     print(f"  (You want intra >> inter. Gap > 0.05 is strong.)")
-    return verdict
+    assert gap > 0, f"Intra-category similarity should be higher than inter-category (gap={gap:.4f})"
 
 
 # ---------------------------------------------------------------------------

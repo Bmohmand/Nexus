@@ -55,7 +55,7 @@ VOYAGE_MODEL: str = "voyage-multimodal-3.5"
 # ---------------------------------------------------------------------------
 # Synthesis model (for final mission plan generation)
 SYNTHESIS_MODEL: str = "gpt-5"
-SYNTHESIS_MAX_TOKENS: int = 2000
+SYNTHESIS_MAX_TOKENS: int = 4000
 
 # GPT-5 reasoning effort per pipeline stage (minimal, low, medium, high)
 # Higher effort = better accuracy, more tokens, higher cost

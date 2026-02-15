@@ -95,8 +95,13 @@ class VoyageEmbedder(BaseEmbedder):
         context_text = self._build_context_text(context)
 
         # Prepare image
-        if isinstance(image_source, str) and not image_source.startswith("http"):
-            image_source = Path(image_source)
+        if isinstance(image_source, bytes):
+            import io
+            from PIL import Image
+            image_source = Image.open(io.BytesIO(image_source))
+        elif isinstance(image_source, Path) or (isinstance(image_source, str) and not image_source.startswith("http")):
+            from PIL import Image
+            image_source = Image.open(image_source)
 
         # Voyage multimodal accepts a list of mixed content
         inputs = [[image_source, context_text]]
