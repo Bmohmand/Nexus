@@ -10,17 +10,17 @@ class NexusApiService {
         'Content-Type': 'application/json',
       };
 
-  // Your FastAPI backend URL - update this with your actual backend URL
-  static const String backendUrl = 'http://10.27.98.162:8000/api/v1'; // TODO: Update this
+  // Your FastAPI backend URL
+  static const String backendUrl = 'http://10.27.98.162:8000';
 
   /// Upload image to backend for ingestion
-  /// POST /api/ingest
+  /// POST /api/v1/ingest
   static Future<Map<String, dynamic>?> ingestImage({
     required String imagePath,
     String? userId,
   }) async {
     try {
-      final uri = Uri.parse('$backendUrl/api/ingest');
+      final uri = Uri.parse('$backendUrl/api/v1/ingest');
       
       var request = http.MultipartRequest('POST', uri);
       request.files.add(await http.MultipartFile.fromPath('image', imagePath));
@@ -45,13 +45,13 @@ class NexusApiService {
   }
 
   /// Perform semantic search
-  /// POST /api/search/semantic
+  /// POST /api/v1/search
   static Future<List<Map<String, dynamic>>?> semanticSearch({
     required String query,
     int topK = 10,
   }) async {
     try {
-      final uri = Uri.parse('$backendUrl/api/search/semantic');
+      final uri = Uri.parse('$backendUrl/api/v1/search');
       
       final response = await http.post(
         uri,
@@ -81,7 +81,7 @@ class NexusApiService {
   }) async {
     try {
       final uri = Uri.parse(
-        '${SupabaseConfig.supabaseUrl}/rest/v1/items?user_id=eq.$userId&select=*',
+        '${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?user_id=eq.$userId&select=*',
       );
 
       final response = await http.get(uri, headers: _supabaseHeaders);
@@ -105,7 +105,7 @@ class NexusApiService {
     required Map<String, dynamic> metadata,
   }) async {
     try {
-      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/items');
+      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items');
 
       final response = await http.post(
         uri,
@@ -140,11 +140,11 @@ class NexusApiService {
   /// Supabase health check
   static Future<bool> supabaseHealthCheck() async {
     try {
-      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/');
+      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?select=id&limit=1');
       final response = await http
           .get(uri, headers: _supabaseHeaders)
           .timeout(const Duration(seconds: 5));
-      return response.statusCode == 200 || response.statusCode == 404;
+      return response.statusCode == 200;
     } catch (e) {
       print('Supabase health check failed: $e');
       return false;
