@@ -7,6 +7,7 @@ embedding -> Supabase upsert), and returns the created item.
 """
 
 import logging
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import Optional
 
@@ -32,11 +33,19 @@ async def ingest_item(
     try:
         logger.info(f"Ingesting item from URL: {request.image_url[:80]}...")
 
+        # DB user_id column is UUID; pass None if not a valid UUID (e.g. "demo_user")
+        user_id = request.user_id
+        if user_id is not None:
+            try:
+                uuid.UUID(user_id)
+            except (ValueError, TypeError):
+                user_id = None
+
         # Run the full pipeline (extract + embed + upsert)
         item_id, context = await pipeline.ingest(
             image_source=request.image_url,
             image_url=request.image_url,
-            user_id=request.user_id,
+            user_id=user_id,
         )
 
         return IngestResponse(
