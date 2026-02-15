@@ -78,6 +78,10 @@ class SupabaseVectorStore:
             "semantic_tags": ctx.semantic_tags,
             "durability": ctx.durability,
             "compressibility": ctx.compressibility,
+            "environmental_suitability": ctx.environmental_suitability,
+            "limitations_and_failure_modes": ctx.limitations_and_failure_modes,
+            "activity_contexts": ctx.activity_contexts or [],
+            "unsuitable_contexts": ctx.unsuitable_contexts or [],
         }
         if user_id:
             row["user_id"] = user_id
