@@ -1,64 +1,53 @@
-# Manifest Backend
+# Nexus Backend
 
-Python FastAPI server + AI pipeline. **Uvicorn is a Python package** — install with `pip`, not `npm`.
+Python FastAPI server + AI pipeline. See the [root README](../README.md) for full project documentation.
 
-## 1. Create a virtual environment (recommended)
-
-Using a venv avoids clashes with other Python projects (e.g. whisperx, label-studio) that want different versions of torch/numpy/protobuf.
+## Quick Start
 
 ```powershell
 cd backend
+
+# 1. Create virtual environment
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
+.\.venv\Scripts\Activate.ps1    # Windows
+# source .venv/bin/activate     # macOS/Linux
 
-(If you get an execution policy error, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once.)
+# 2. Install all dependencies (single consolidated file)
+pip install -r requirements.txt
 
-Then install and run from this shell; only this project's deps will be used.
+# 3. Configure environment variables
+copy .env.example .env          # Then edit with your API keys
 
-## 2. Install dependencies
-
-From the `backend` folder (with the venv activated):
-
-```powershell
-pip install -r ai_modules/requirements.txt -r server/requirements.txt
-```
-
-Or install only what you need to run the API (no local CLIP):
-
-```powershell
-pip install pydantic openai supabase fastapi "uvicorn[standard]" python-multipart voyageai httpx
-```
-
-## 3. Set environment variables
-
-The server loads **`backend/.env`** at startup. Create it from the example:
-
-```powershell
-copy .env.example .env
-```
-
-Then edit `backend/.env` and set:
-
-- **OPENAI_API_KEY** — from OpenAI
-- **VOYAGE_API_KEY** — from Voyage AI
-- **SUPABASE_URL** — from Supabase Dashboard → Project Settings → API
-- **SUPABASE_SERVICE_KEY** — use the **service_role** key (secret), not the anon key
-
-(You can copy SUPABASE_URL from the frontend `.env`; the backend needs the **service_role** key for database/vector writes.)
-
-## 4. Run the API server
-
-From the `backend` folder:
-
-```powershell
+# 4. Run the server
 python -m uvicorn server.main:app --reload --port 8000
 ```
 
-Or use the script:
+API docs: `http://localhost:8000/docs`
+
+## Environment Variables
+
+The server loads `backend/.env` at startup. Required keys:
+
+| Variable | Source |
+|---|---|
+| `OPENAI_API_KEY` | [OpenAI](https://platform.openai.com) |
+| `VOYAGE_API_KEY` | [Voyage AI](https://voyageai.com) |
+| `SUPABASE_URL` | Supabase Dashboard → Project Settings → API |
+| `SUPABASE_SERVICE_KEY` | Supabase **service_role** key (not the anon key) |
+
+## Minimal Install (no local CLIP fallback)
+
+If you don't need offline CLIP embeddings, skip the heavy PyTorch dependencies:
 
 ```powershell
-.\run_server.bat
+pip install pydantic openai supabase fastapi "uvicorn[standard]" python-multipart voyageai httpx python-dotenv numpy Pillow ortools requests
 ```
 
-Then open the Flutter app; it will call `http://localhost:8000` by default.
+## Seed Scripts
+
+Populate the database with sample items:
+
+```powershell
+python seed_test_images.py    # 34 local test images
+python seed_dummyjson.py      # 100 products from DummyJSON API
+```

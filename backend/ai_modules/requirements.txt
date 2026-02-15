@@ -1,5 +1,7 @@
 # Nexus AI Pipeline - Requirements
-# Install: pip install -r requirements.txt
+# NOTE: Prefer installing from the consolidated file:
+#   pip install -r backend/requirements.txt
+# This file is kept for reference.
 
 # Core
 pydantic>=2.5.0

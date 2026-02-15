@@ -1,0 +1,34 @@
+# Nexus — All Python Dependencies
+# Install: pip install -r requirements.txt
+
+# ── API Server ──────────────────────────────────────────────────────
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6          # File uploads (multipart/form-data)
+python-dotenv>=1.0.0             # Load .env files
+
+# ── Data Validation ─────────────────────────────────────────────────
+pydantic>=2.5.0
+
+# ── AI / LLM ───────────────────────────────────────────────────────
+openai>=1.12.0                   # GPT-5 Vision (context extraction) + GPT-5 (synthesis)
+voyageai>=0.3.0                  # Voyage multimodal-3.5 embeddings
+
+# ── Embeddings — Local CLIP Fallback (optional, for offline dev) ───
+open-clip-torch>=2.24.0
+torch>=2.1.0
+torchvision>=0.16.0
+Pillow>=10.0.0                   # Image preprocessing
+
+# ── Vector Database ─────────────────────────────────────────────────
+supabase>=2.3.0                  # Supabase client (PostgreSQL + pgvector via RPC)
+
+# ── Optimization ────────────────────────────────────────────────────
+ortools>=9.8                     # Google OR-Tools CP-SAT solver (knapsack)
+
+# ── HTTP / Networking ───────────────────────────────────────────────
+httpx>=0.26.0                    # Async HTTP client (URL image fetching)
+requests>=2.31.0                 # Sync HTTP client (seed scripts, DummyJSON)
+
+# ── Utilities ───────────────────────────────────────────────────────
+numpy>=1.24.0                    # Vector operations

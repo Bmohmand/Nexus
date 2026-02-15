@@ -1,4 +1,7 @@
 # Manifest API Server
+# NOTE: Prefer installing from the consolidated file:
+#   pip install -r backend/requirements.txt
+# This file is kept for reference.
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.6       # For file uploads
