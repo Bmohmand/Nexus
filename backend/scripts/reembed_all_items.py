@@ -53,20 +53,31 @@ TABLE = "manifest_items"
 
 def fetch_all_items(store: SupabaseVectorStore, only_missing: bool) -> list[dict]:
     """Fetch all items from Supabase that need re-embedding."""
-    query = store.client.table(TABLE).select(
-        "id, image_url, user_id, name, activity_contexts, unsuitable_contexts"
-    )
+    # First try with new columns; if they don't exist yet fall back to base columns
+    try:
+        query = store.client.table(TABLE).select(
+            "id, image_url, user_id, name, activity_contexts, unsuitable_contexts"
+        )
+        response = query.execute()
+        has_new_cols = True
+    except Exception:
+        logger.warning("New columns not found — run migration 012 first for --only-missing support")
+        query = store.client.table(TABLE).select("id, image_url, user_id, name")
+        response = query.execute()
+        has_new_cols = False
 
-    response = query.execute()
     items = response.data or []
 
-    if only_missing:
+    if only_missing and has_new_cols:
         # Only re-embed items that don't have the new fields populated
         items = [
             item for item in items
             if not item.get("activity_contexts")
             or not item.get("unsuitable_contexts")
         ]
+    elif only_missing and not has_new_cols:
+        # Columns don't exist yet, so every item is "missing"
+        logger.info("New columns missing from table — all items need re-embedding")
 
     return items
 
