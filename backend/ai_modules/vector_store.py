@@ -16,7 +16,7 @@ from typing import Optional
 
 from supabase import create_client, AsyncClient
 
-from .config import SUPABASE_URL, SUPABASE_SERVICE_KEY, get_embedding_dim
+from .config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SIMILARITY_THRESHOLD, get_embedding_dim
 from .models import ItemContext, EmbeddingResult, RetrievedItem
 
 logger = logging.getLogger("manifest.vectorstore")
@@ -93,6 +93,10 @@ class SupabaseVectorStore:
             "semantic_tags": ctx.semantic_tags,
             "durability": ctx.durability,
             "compressibility": ctx.compressibility,
+            "environmental_suitability": ctx.environmental_suitability,
+            "limitations_and_failure_modes": ctx.limitations_and_failure_modes,
+            "activity_contexts": ctx.activity_contexts or [],
+            "unsuitable_contexts": ctx.unsuitable_contexts or [],
         }
         if user_id:
             row["user_id"] = user_id
@@ -132,9 +136,14 @@ class SupabaseVectorStore:
 
         items = []
         for row in response.data:
+            score = float(row["similarity"])
+            # Filter out items below the similarity threshold to prevent
+            # irrelevant results (e.g., stethoscope for a hiking trip)
+            if score < SIMILARITY_THRESHOLD:
+                continue
             items.append(RetrievedItem(
                 item_id=str(row["id"]),
-                score=float(row["similarity"]),
+                score=score,
                 image_url=row.get("image_url"),
                 weight_grams=row.get("weight_grams"),
                 context=ItemContext(
@@ -149,11 +158,15 @@ class SupabaseVectorStore:
                     semantic_tags=row.get("semantic_tags", []),
                     durability=row.get("durability"),
                     compressibility=row.get("compressibility"),
+                    environmental_suitability=row.get("environmental_suitability"),
+                    limitations_and_failure_modes=row.get("limitations_and_failure_modes"),
+                    activity_contexts=row.get("activity_contexts", []),
+                    unsuitable_contexts=row.get("unsuitable_contexts", []),
                 ),
             ))
 
         logger.info(
-            f"Search returned {len(items)} items"
+            f"Search returned {len(items)} items (filtered from {len(response.data)} by threshold={SIMILARITY_THRESHOLD})"
             + (f" (top score: {items[0].score:.4f})" if items else "")
         )
         return items
