@@ -5,6 +5,11 @@
 !/.vscode/tasks.json # Un-ignore shared task definitions
 !/.vscode/extensions.json # Un-ignore recommended extensions
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
 # Miscellaneous global ignores
 *.bak
 *.orig
