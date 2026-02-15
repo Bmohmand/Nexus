@@ -14,37 +14,35 @@ class NexusApiService {
   // Your FastAPI backend URL
   static const String backendUrl = 'http://10.27.98.162:8000';
 
-  /// Upload image to backend for ingestion
+  /// Upload image to backend for ingestion (sends image URL)
   /// POST /api/v1/ingest
-  /// Upload image to backend for ingestion
-/// POST /api/v1/ingest (expects JSON with image_url)
-static Future<Map<String, dynamic>?> ingestImage({
-  required String imageUrl,  // Changed from imagePath to imageUrl
-  String? userId,
-}) async {
-  try {
-    final uri = Uri.parse('$backendUrl/api/v1/ingest');
-    
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'image_url': imageUrl,  // Send URL, not file
-        if (userId != null) 'user_id': userId,
-      }),
-    );
+  static Future<Map<String, dynamic>?> ingestImage({
+    required String imageUrl,
+    String? userId,
+  }) async {
+    try {
+      final uri = Uri.parse('$backendUrl/api/v1/ingest');
+      
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'image_url': imageUrl,
+          if (userId != null) 'user_id': userId,
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      print('Error ingesting image: ${response.statusCode} - ${response.body}');
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('Error ingesting image: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Exception during image ingest: $e');
       return null;
     }
-  } catch (e) {
-    print('Exception during image ingest: $e');
-    return null;
   }
-}
 
   /// Perform semantic search
   /// POST /api/v1/search
@@ -154,34 +152,54 @@ static Future<Map<String, dynamic>?> ingestImage({
   }
 
   /// Upload image to Supabase Storage and return public URL
-  /// Upload image to Supabase Storage and return public URL
-static Future<String?> uploadImageToStorage(String imagePath) async {
-  try {
-    final file = File(imagePath);
-    final bytes = await file.readAsBytes();
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-    
-    final response = await http.post(
-      Uri.parse('${SupabaseConfig.supabaseUrl}/storage/v1/object/manifest-assets/$fileName'),
-      headers: {
-        'apikey': SupabaseConfig.supabaseAnonKey,  // ADD THIS LINE
-        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
-        'Content-Type': 'image/jpeg',
-      },
-      body: bytes,
-    );
+  static Future<String?> uploadImageToStorage(String imagePath) async {
+    try {
+      final file = File(imagePath);
+      final bytes = await file.readAsBytes();
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.supabaseUrl}/storage/v1/object/manifest-assets/$fileName'),
+        headers: {
+          'apikey': SupabaseConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+          'Content-Type': 'image/jpeg',
+        },
+        body: bytes,
+      );
 
-    print('Upload response: ${response.statusCode} - ${response.body}');  // ADD DEBUG
+      print('Upload response: ${response.statusCode} - ${response.body}');
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/manifest-assets/$fileName';
-    } else {
-      print('Error uploading to storage: ${response.statusCode} - ${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/manifest-assets/$fileName';
+      } else {
+        print('Error uploading to storage: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Exception uploading image: $e');
       return null;
     }
-  } catch (e) {
-    print('Exception uploading image: $e');
-    return null;
   }
-}
+
+  /// Get all items from manifest_items table
+  static Future<List<Map<String, dynamic>>?> getManifestItems() async {
+    try {
+      final uri = Uri.parse(
+        '${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?select=*&order=created_at.desc',
+      );
+
+      final response = await http.get(uri, headers: _supabaseHeaders);
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      } else {
+        print('Error fetching manifest items: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Exception fetching manifest items: $e');
+      return null;
+    }
+  }
 }
