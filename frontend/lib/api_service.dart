@@ -153,7 +153,119 @@ static Future<Map<String, dynamic>?> ingestImage({
     }
   }
 
-  /// Upload image to Supabase Storage and return public URL
+  // ---------------------------------------------------------------------------
+  // Storage Containers
+  // ---------------------------------------------------------------------------
+
+  /// List all storage containers for a user
+  /// GET /api/v1/containers
+  static Future<List<Map<String, dynamic>>?> getContainers({
+    String? userId,
+  }) async {
+    try {
+      String url = '$backendUrl/api/v1/containers';
+      if (userId != null) url += '?user_id=$userId';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data['containers']);
+      }
+      return null;
+    } catch (e) {
+      print('Exception fetching containers: $e');
+      return null;
+    }
+  }
+
+  /// Create a new storage container
+  /// POST /api/v1/containers
+  static Future<Map<String, dynamic>?> createContainer({
+    required Map<String, dynamic> containerData,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$backendUrl/api/v1/containers'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(containerData),
+      );
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      }
+      print('Error creating container: ${response.statusCode} - ${response.body}');
+      return null;
+    } catch (e) {
+      print('Exception creating container: $e');
+      return null;
+    }
+  }
+
+  /// Update an existing storage container
+  /// PATCH /api/v1/containers/{id}
+  static Future<Map<String, dynamic>?> updateContainer({
+    required String containerId,
+    required Map<String, dynamic> updates,
+  }) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$backendUrl/api/v1/containers/$containerId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(updates),
+      );
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Exception updating container: $e');
+      return null;
+    }
+  }
+
+  /// Delete a storage container
+  /// DELETE /api/v1/containers/{id}
+  static Future<bool> deleteContainer({required String containerId}) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$backendUrl/api/v1/containers/$containerId'),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Exception deleting container: $e');
+      return false;
+    }
+  }
+
+  /// Multi-container pack — distribute items across selected containers
+  /// POST /api/v1/pack/multi
+  static Future<Map<String, dynamic>?> packMultiContainer({
+    required String query,
+    required List<String> containerIds,
+    int topK = 30,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$backendUrl/api/v1/pack/multi'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'query': query,
+          'container_ids': containerIds,
+          'top_k': topK,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      print('Error during multi-container pack: ${response.statusCode} - ${response.body}');
+      return null;
+    } catch (e) {
+      print('Exception during multi-container pack: $e');
+      return null;
+    }
+  }
+
   /// Upload image to Supabase Storage and return public URL
 static Future<String?> uploadImageToStorage(String imagePath) async {
   try {
