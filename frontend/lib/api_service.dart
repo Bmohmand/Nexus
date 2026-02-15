@@ -12,7 +12,7 @@ class NexusApiService {
       };
 
   // Your FastAPI backend URL
-  static const String backendUrl = 'http://10.27.98.162:8000';
+  static String get backendUrl => dotenv.env['API_BASE_URL'] ?? 'http://10.27.98.162:8000';
 
   /// Upload image to backend for ingestion
   /// POST /api/v1/ingest
