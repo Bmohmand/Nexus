@@ -118,13 +118,25 @@ class MissionSynthesizer:
             response_format={"type": "json_object"},
         )
 
-        raw = response.choices[0].message.content
+        msg = response.choices[0].message
+        raw = msg.content if msg.content is not None else ""
+        if not raw.strip():
+            refusal = getattr(msg, "refusal", None) or ""
+            logger.error(
+                "Synthesis returned empty content (reasoning models may exhaust tokens on thinking). "
+                "Refusal: %s",
+                refusal or "(none)",
+            )
+            raise ValueError(
+                "Synthesis returned empty response. "
+                "Try increasing max_completion_tokens or lowering reasoning_effort."
+            )
         logger.info(f"Synthesis output: {raw[:300]}...")
 
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
-            logger.error(f"Synthesis returned invalid JSON: {e}")
+            logger.error(f"Synthesis returned invalid JSON: {e}\nRaw: {raw[:500]}")
             raise ValueError(f"Synthesis failed: {e}")
 
         return self._parse_plan(data, retrieved_items)
