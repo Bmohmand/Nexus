@@ -16,7 +16,7 @@ from typing import Optional
 
 from supabase import create_client, AsyncClient
 
-from .config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SIMILARITY_THRESHOLD, get_embedding_dim
+from .config import SUPABASE_URL, SUPABASE_SERVICE_KEY, get_embedding_dim
 from .models import ItemContext, EmbeddingResult, RetrievedItem
 
 logger = logging.getLogger("manifest.vectorstore")
@@ -24,14 +24,6 @@ logger = logging.getLogger("manifest.vectorstore")
 # Table and RPC names (aligned with backend/migrations/)
 TABLE_NAME = "manifest_items"
 RPC_NAME = "match_manifest_items"
-
-# Same mapping as knapsack_optimizer.WEIGHT_ESTIMATES_GRAMS for populating weight_grams on ingest
-_WEIGHT_ESTIMATE_TO_GRAMS = {
-    "ultralight": 100,
-    "light": 300,
-    "medium": 700,
-    "heavy": 1500,
-}
 
 
 class SupabaseVectorStore:
@@ -70,12 +62,6 @@ class SupabaseVectorStore:
             The item's UUID
         """
         ctx = result.context
-        weight_grams = None
-        if ctx.weight_estimate:
-            weight_grams = _WEIGHT_ESTIMATE_TO_GRAMS.get(
-                ctx.weight_estimate.strip().lower(),
-                500,
-            )
         row = {
             "id": result.item_id,
             "embedding": result.vector,
@@ -85,7 +71,6 @@ class SupabaseVectorStore:
             "category": ctx.inferred_category,
             "primary_material": ctx.primary_material,
             "weight_estimate": ctx.weight_estimate,
-            "weight_grams": weight_grams,
             "thermal_rating": ctx.thermal_rating,
             "water_resistance": ctx.water_resistance,
             "medical_application": ctx.medical_application,
@@ -93,10 +78,6 @@ class SupabaseVectorStore:
             "semantic_tags": ctx.semantic_tags,
             "durability": ctx.durability,
             "compressibility": ctx.compressibility,
-            "environmental_suitability": ctx.environmental_suitability,
-            "limitations_and_failure_modes": ctx.limitations_and_failure_modes,
-            "activity_contexts": ctx.activity_contexts or [],
-            "unsuitable_contexts": ctx.unsuitable_contexts or [],
         }
         if user_id:
             row["user_id"] = user_id
@@ -119,33 +100,28 @@ class SupabaseVectorStore:
             query_vector: The embedded query
             top_k: Number of nearest neighbors to return
             category_filter: Optional category to restrict search
-            user_id: Optional user UUID to scope search to a specific user's items
+            user_id: Optional user UUID to scope search
 
         Returns:
             List of RetrievedItem sorted by similarity (highest first)
         """
-        params = {
-            "query_embedding": query_vector,
-            "match_count": top_k,
-            "filter_category": category_filter,
-        }
-        if user_id is not None:
-            params["filter_user_id"] = user_id
-
-        response = self.client.rpc(RPC_NAME, params).execute()
+        response = self.client.rpc(
+            RPC_NAME,
+            {
+                "query_embedding": query_vector,
+                "match_count": top_k,
+                "filter_category": category_filter,
+                "filter_user_id": user_id,
+                "min_similarity": 0.0,  # Explicitly pass this to resolve function overloading ambiguity (PGRST203)
+            },
+        ).execute()
 
         items = []
         for row in response.data:
-            score = float(row["similarity"])
-            # Filter out items below the similarity threshold to prevent
-            # irrelevant results (e.g., stethoscope for a hiking trip)
-            if score < SIMILARITY_THRESHOLD:
-                continue
             items.append(RetrievedItem(
                 item_id=str(row["id"]),
-                score=score,
+                score=float(row["similarity"]),
                 image_url=row.get("image_url"),
-                weight_grams=row.get("weight_grams"),
                 context=ItemContext(
                     name=row["name"],
                     inferred_category=row.get("category", "misc"),
@@ -158,15 +134,11 @@ class SupabaseVectorStore:
                     semantic_tags=row.get("semantic_tags", []),
                     durability=row.get("durability"),
                     compressibility=row.get("compressibility"),
-                    environmental_suitability=row.get("environmental_suitability"),
-                    limitations_and_failure_modes=row.get("limitations_and_failure_modes"),
-                    activity_contexts=row.get("activity_contexts", []),
-                    unsuitable_contexts=row.get("unsuitable_contexts", []),
                 ),
             ))
 
         logger.info(
-            f"Search returned {len(items)} items (filtered from {len(response.data)} by threshold={SIMILARITY_THRESHOLD})"
+            f"Search returned {len(items)} items"
             + (f" (top score: {items[0].score:.4f})" if items else "")
         )
         return items

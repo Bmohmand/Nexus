@@ -47,27 +47,27 @@ INSTRUCTIONS:
 5. Flag any critical gaps (e.g., "No water purification detected — critical for remote missions").
 
 Respond with ONLY this JSON structure:
-{
+{{
   "mission_summary": "Brief interpretation of the mission context",
   "selected_items": [
-    {
+    {{
       "item_id": "...",
       "name": "...",
       "reason": "Why this item is essential for this specific mission"
-    }
+    }}
   ],
   "rejected_items": [
-    {
+    {{
       "item_id": "...",
       "name": "...",
       "reason": "Why this item was excluded despite being semantically similar"
-    }
+    }}
   ],
   "warnings": ["List of critical gaps or safety concerns"],
   "cross_domain_insights": [
     "Observations about unexpected item connections, e.g., 'The mylar emergency blanket serves both medical (shock prevention) and survival (thermal retention) roles'"
   ]
-}"""
+}}"""
 
 
 class MissionSynthesizer:
