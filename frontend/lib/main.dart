@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'api_service.dart';
 import 'models/storage_container.dart';
+import 'package:vector_math/vector_math_64.dart' as vm;
+import 'dart:math' as math;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1659,73 +1661,219 @@ class _CameraIngestViewState extends State<CameraIngestView> {
     }
 
 // Graph Visualization View
-class GraphVisualizationView extends StatelessWidget {
+class GraphVisualizationView extends StatefulWidget {
   const GraphVisualizationView({super.key});
+
+  @override
+  State<GraphVisualizationView> createState() => _GraphVisualizationViewState();
+}
+
+class _GraphVisualizationViewState extends State<GraphVisualizationView> {
+  List<GraphNode> _nodes = [];
+  bool _isLoading = true;
+  String _statusMessage = 'Loading items...';
+  double _rotationX = 0.0;
+  double _rotationY = 0.0;
+  double _lastRotationX = 0.0;
+  double _lastRotationY = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGraphData();
+  }
+
+  Future<void> _loadGraphData() async {
+    try {
+      setState(() {
+        _statusMessage = 'Fetching items from database...';
+      });
+
+      // Fetch items with embeddings
+      final items = await NexusApiService.getManifestItems();
+      
+      if (items == null || items.isEmpty) {
+        setState(() {
+          _statusMessage = 'No items found';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Filter items with embeddings
+      final itemsWithEmbeddings = items.where((item) {
+        final embedding = item['embedding'];
+        return embedding != null && embedding is List && embedding.isNotEmpty;
+      }).toList();
+
+      if (itemsWithEmbeddings.isEmpty) {
+        setState(() {
+          _statusMessage = 'No items with embeddings found';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _statusMessage = 'Reducing ${itemsWithEmbeddings.length} embeddings to 3D...';
+      });
+
+      // Extract embeddings as List<List<double>>
+      final embeddings = itemsWithEmbeddings.map((item) {
+        final embedding = item['embedding'] as List;
+        return embedding.map((e) => (e as num).toDouble()).toList();
+      }).toList();
+
+      // Perform PCA to reduce to 3D
+      final positions3D = _performPCA(embeddings, 3);
+
+      // Create graph nodes
+      final nodes = <GraphNode>[];
+      for (int i = 0; i < itemsWithEmbeddings.length; i++) {
+        final item = itemsWithEmbeddings[i];
+        final category = (item['category'] ?? item['domain'] ?? 'misc').toString().toLowerCase();
+        
+        nodes.add(GraphNode(
+          id: item['id']?.toString() ?? i.toString(),
+          name: item['name']?.toString() ?? 'Unknown Item',
+          category: category,
+          position: vm.Vector3(
+            positions3D[i][0],
+            positions3D[i][1],
+            positions3D[i][2],
+          ),
+          color: _getCategoryColor(category),
+        ));
+      }
+
+      setState(() {
+        _nodes = nodes;
+        _isLoading = false;
+        _statusMessage = '';
+      });
+
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Error: $e';
+        _isLoading = false;
+      });
+      print('Error loading graph data: $e');
+    }
+  }
+
+  // Simple PCA implementation
+  List<List<double>> _performPCA(List<List<double>> embeddings, int targetDim) {
+    final n = embeddings.length;
+    final d = embeddings[0].length;
+
+    print('PCA: $n items, $d dimensions → $targetDim dimensions');
+
+    // Center the data
+    final mean = List<double>.filled(d, 0.0);
+    for (var emb in embeddings) {
+      for (int j = 0; j < d; j++) {
+        mean[j] += emb[j];
+      }
+    }
+    for (int j = 0; j < d; j++) {
+      mean[j] /= n;
+    }
+
+    final centered = embeddings.map((emb) {
+      return List.generate(d, (j) => emb[j] - mean[j]);
+    }).toList();
+
+    // Simple projection (approximate PCA)
+    final positions = <List<double>>[];
+    final third = d ~/ 3;
+    
+    for (var emb in centered) {
+      final x = emb.sublist(0, third).reduce((a, b) => a + b) / third;
+      final y = emb.sublist(third, third * 2).reduce((a, b) => a + b) / third;
+      final z = emb.sublist(third * 2).reduce((a, b) => a + b) / (d - third * 2);
+      
+      positions.add([x * 50, y * 50, z * 50]);
+    }
+
+    return positions;
+  }
+
+  Color _getCategoryColor(String category) {
+    const colors = {
+      'clothing': Color(0xFF6366F1),
+      'medical': Color(0xFFEF4444),
+      'survival': Color(0xFF10B981),
+      'tech': Color(0xFF8B5CF6),
+      'food': Color(0xFFF59E0B),
+      'camping': Color(0xFF14B8A6),
+    };
+    return colors[category] ?? const Color(0xFF64748B);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      color: const Color(0xFF0F172A),
+      child: _isLoading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Semantic Graph',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                  const CircularProgressIndicator(
+                    color: Color(0xFF6366F1),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 16),
                   Text(
-                    'Vector space visualization',
-                    style: TextStyle(
-                      color: Color(0xFF64748B),
-                      fontSize: 14,
+                    _statusMessage,
+                    style: const TextStyle(
+                      color: Color(0xFF6366F1),
+                      fontSize: 16,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFF334155),
-                  width: 1,
+            )
+          : Stack(
+              children: [
+                // 3D Graph
+                GestureDetector(
+                  onPanUpdate: (details) {
+                    setState(() {
+                      _rotationY += details.delta.dx * 0.01;
+                      _rotationX += details.delta.dy * 0.01;
+                    });
+                  },
+                  onPanEnd: (details) {
+                    _lastRotationX = _rotationX;
+                    _lastRotationY = _rotationY;
+                  },
+                  child: CustomPaint(
+                    painter: Graph3DPainter(
+                      nodes: _nodes,
+                      rotationX: _rotationX,
+                      rotationY: _rotationY,
+                    ),
+                    size: Size.infinite,
+                  ),
                 ),
-              ),
-              child: Stack(
-                children: [
-                  Center(
+                
+                // Legend
+                Positioned(
+                  top: 20,
+                  left: 20,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF334155)),
+                    ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF334155),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.scatter_plot,
-                            size: 64,
-                            color: Color(0xFF6366F1),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         const Text(
-                          '3D Force Graph',
+                          'Semantic Graph',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -1733,105 +1881,77 @@ class GraphVisualizationView extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Items cluster by semantic similarity',
-                          style: TextStyle(
-                            color: Color(0xFF64748B),
+                        Text(
+                          '${_nodes.length} items in vector space',
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
                             fontSize: 14,
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        _buildLegendItem('Clothing', const Color(0xFF6366F1)),
+                        _buildLegendItem('Medical', const Color(0xFFEF4444)),
+                        _buildLegendItem('Survival', const Color(0xFF10B981)),
+                        _buildLegendItem('Tech', const Color(0xFF8B5CF6)),
+                        _buildLegendItem('Food', const Color(0xFFF59E0B)),
                       ],
                     ),
                   ),
-                  // Legend
-                  Positioned(
-                    top: 16,
-                    right: 16,
+                ),
+                
+                // Hint
+                Positioned(
+                  bottom: 20,
+                  left: 0,
+                  right: 0,
+                  child: Center(
                     child: Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color.fromRGBO(255, 15, 23, 0.9),
-                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFF0F172A).withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 6,
-                                backgroundColor: Color(0xFF6366F1),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Clothing',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 6,
-                                backgroundColor: Color(0xFFEF4444),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Medical',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 6,
-                                backgroundColor: Color(0xFF10B981),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Survival',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      child: const Text(
+                        'Drag to rotate • Items cluster by semantic similarity',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color.fromRGBO(255, 30, 41, 0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline, color: Color(0xFF6366F1), size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Distance between nodes represents cosine similarity in vector space',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                  ),
                 ),
               ],
+            ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.5),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
             ),
           ),
         ],
@@ -1840,6 +1960,107 @@ class GraphVisualizationView extends StatelessWidget {
   }
 }
 
+// Graph Node Model
+class GraphNode {
+  final String id;
+  final String name;
+  final String category;
+  final vm.Vector3 position;
+  final Color color;
+
+  GraphNode({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.position,
+    required this.color,
+  });
+}
+
+// 3D Graph Painter
+class Graph3DPainter extends CustomPainter {
+  final List<GraphNode> nodes;
+  final double rotationX;
+  final double rotationY;
+
+  Graph3DPainter({
+    required this.nodes,
+    required this.rotationX,
+    required this.rotationY,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    final scale = 3.0;
+
+    // Sort nodes by Z position (painter's algorithm)
+    final sortedNodes = List<GraphNode>.from(nodes);
+    sortedNodes.sort((a, b) {
+      final aRotated = _rotatePoint(a.position);
+      final bRotated = _rotatePoint(b.position);
+      return bRotated.z.compareTo(aRotated.z);
+    });
+
+    // Draw nodes
+    for (final node in sortedNodes) {
+      final rotated = _rotatePoint(node.position);
+      
+      // Perspective projection
+      final perspective = 1.0 / (1.0 + rotated.z / 500);
+      final screenX = centerX + rotated.x * scale * perspective;
+      final screenY = centerY + rotated.y * scale * perspective;
+      
+      // Node size based on depth
+      final nodeSize = 8.0 * perspective;
+      
+      // Draw node with glow
+      final paint = Paint()
+        ..color = node.color.withOpacity(0.3)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      
+      canvas.drawCircle(
+        Offset(screenX, screenY),
+        nodeSize * 2,
+        paint,
+      );
+      
+      final nodePaint = Paint()
+        ..color = node.color
+        ..style = PaintingStyle.fill;
+      
+      canvas.drawCircle(
+        Offset(screenX, screenY),
+        nodeSize,
+        nodePaint,
+      );
+    }
+  }
+
+  vm.Vector3 _rotatePoint(vm.Vector3 point) {
+    // Rotate around Y axis
+    final cosY = math.cos(rotationY);
+    final sinY = math.sin(rotationY);
+    final x1 = point.x * cosY - point.z * sinY;
+    final z1 = point.x * sinY + point.z * cosY;
+    
+    // Rotate around X axis
+    final cosX = math.cos(rotationX);
+    final sinX = math.sin(rotationX);
+    final y2 = point.y * cosX - z1 * sinX;
+    final z2 = point.y * sinX + z1 * cosX;
+    
+    return vm.Vector3(x1, y2, z2);
+  }
+
+  @override
+  bool shouldRepaint(Graph3DPainter oldDelegate) {
+    return rotationX != oldDelegate.rotationX ||
+           rotationY != oldDelegate.rotationY ||
+           nodes != oldDelegate.nodes;
+  }
+}
 
 // Storage Containers View
 class ContainersView extends StatefulWidget {
