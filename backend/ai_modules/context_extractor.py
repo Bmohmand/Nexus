@@ -47,7 +47,9 @@ Analyze the image thoroughly and return ONLY a valid JSON object matching the ex
   "utility_summary": "1-2 sentences: what is this item useful for? In what scenarios?",
   "semantic_tags": ["tag1", "tag2", "tag3"],
   "durability": "One of: disposable, reusable, rugged",
-  "compressibility": "One of: highly_compressible, moderate, rigid"
+  "compressibility": "One of: highly_compressible, moderate, rigid",
+  "activity_contexts": ["List of activities/scenarios this item is WELL-SUITED for. Be specific: 'hiking', 'backpacking', 'clinical_medicine', 'emergency_response', 'urban_travel', 'winter_camping', 'water_sports', 'air_travel', 'cycling', 'running', 'mountaineering', 'car_camping', 'day_trip', 'multi_day_trek', 'wilderness_survival', 'hospital', 'field_medicine', 'home_first_aid'"],
+  "unsuitable_contexts": ["List of activities/scenarios this item is NOT suited for or would be inappropriate/useless in. E.g. a stethoscope is unsuitable for 'hiking', 'camping', 'outdoor_recreation'. A cotton t-shirt is unsuitable for 'cold_weather', 'rain', 'winter_camping'."]
 }
 
 IMPORTANT RULES:
@@ -55,6 +57,7 @@ IMPORTANT RULES:
 - For medical items, always note whether they are sterile and single-use.
 - semantic_tags should include cross-domain utility hints. A mylar blanket is BOTH medical AND survival.
 - If you can identify the brand, include it in the name (e.g., "Patagonia Down Sweater Jacket").
+- activity_contexts and unsuitable_contexts are CRITICAL for search quality. A stethoscope belongs in 'clinical_medicine' and 'hospital', NOT in 'hiking' or 'camping'. A bandage belongs in both 'field_medicine' AND 'hiking'. Think carefully about where each item actually makes sense.
 - Return ONLY valid JSON. No markdown, no explanation."""
 
 
