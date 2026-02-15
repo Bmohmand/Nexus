@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+<string>We need camera access to scan your items</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>We need photo library access to select your items</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>Microphone access for video recording</string>
 </dict>
 </plist>

@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.1.0
+  image_picker: ^1.0.4
+  path_provider: ^2.1.1
+  path: ^1.8.3
 
   # HTTP client for FastAPI backend
   dio: ^5.7.0
@@ -17,7 +21,7 @@ dependencies:
   # Supabase (Storage upload, optional auth)
   supabase_flutter: ^2.8.0
   # Image picker for camera/gallery
-  image_picker: ^1.1.2
+ 
 
 dev_dependencies:
   flutter_test:

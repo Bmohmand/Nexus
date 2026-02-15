@@ -1,58 +1,10 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'dart:io';
 import 'api_service.dart';
-import 'models/search_result.dart';
-import 'models/vault_item.dart';
-import 'storage_service.dart';
-import 'supabase_config.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await SupabaseConfig.initialize();
-  } catch (e) {
-    runApp(_ConfigErrorApp(error: e));
-    return;
-  }
+void main() {
   runApp(const MyApp());
-}
-
-class _ConfigErrorApp extends StatelessWidget {
-  final Object error;
-
-  const _ConfigErrorApp({required this.error});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text(
-                  error.toString(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Please check your .env file (SUPABASE_URL, SUPABASE_ANON_KEY).',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class MyApp extends StatelessWidget {
@@ -85,7 +37,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
-  int _itemsRefreshKey = 0;
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
@@ -94,6 +45,169 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _testConnections(); // Test backend and Supabase on startup
+  }
+
+  /// Test both backend and Supabase connections
+  Future<void> _testConnections() async {
+    // Wait a moment for the UI to render
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Test Supabase
+    final supabaseOk = await NexusApiService.supabaseHealthCheck();
+    
+    // Test Backend (will fail if not configured yet, that's OK)
+    final backendOk = await NexusApiService.healthCheck();
+    
+    if (!mounted) return;
+    
+    // Show status
+    String message = '';
+    Color color = const Color(0xFF10B981);
+    
+    if (supabaseOk && backendOk) {
+      message = '✅ Connected: Supabase & Backend';
+      color = const Color(0xFF10B981); // Green
+    } else if (supabaseOk && !backendOk) {
+      message = '⚠️ Supabase: ✅ | Backend: ❌ (Update URL in api_service.dart)';
+      color = const Color(0xFFF59E0B); // Orange
+    } else if (!supabaseOk && backendOk) {
+      message = '⚠️ Supabase: ❌ | Backend: ✅';
+      color = const Color(0xFFF59E0B); // Orange
+    } else {
+      message = '❌ Not Connected: Check configuration';
+      color = const Color(0xFFEF4444); // Red
+    }
+    
+    // Show snackbar with status
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
+  }
+
+  /// Show detailed connection status
+  void _showConnectionStatus() async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    // Test connections
+    final supabaseOk = await NexusApiService.supabaseHealthCheck();
+    final backendOk = await NexusApiService.healthCheck();
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close loading
+
+    // Show results
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_tethering, color: Color(0xFF6366F1)),
+            SizedBox(width: 12),
+            Text('Connection Status', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStatusRow('Supabase Database', supabaseOk),
+            const SizedBox(height: 12),
+            _buildStatusRow('FastAPI Backend', backendOk),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF334155),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Configuration',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Supabase: ${supabaseOk ? "Connected" : "Check credentials"}',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Backend: ${backendOk ? "Connected" : "Update URL in api_service.dart"}',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          if (!backendOk || !supabaseOk)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _testConnections();
+              },
+              child: const Text('Retry'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(String label, bool isConnected) {
+    return Row(
+      children: [
+        Icon(
+          isConnected ? Icons.check_circle : Icons.cancel,
+          color: isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+        ),
+        Text(
+          isConnected ? 'Online' : 'Offline',
+          style: TextStyle(
+            color: isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -115,10 +229,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             Expanded(
               child: IndexedStack(
                 index: _selectedIndex,
-                children: [
-                  ItemsGridView(key: ValueKey(_itemsRefreshKey)),
-                  const CameraIngestView(),
-                  const GraphVisualizationView(),
+                children: const [
+                  ItemsGridView(),
+                  CameraIngestView(),
+                  GraphVisualizationView(),
                 ],
               ),
             ),
@@ -172,7 +286,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               const Spacer(),
               IconButton(
-                onPressed: () {},
+                onPressed: _showConnectionStatus,
                 icon: const Icon(Icons.settings_outlined, color: Color(0xFF94A3B8)),
               ),
             ],
@@ -280,7 +394,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
-            if (index == 0) _itemsRefreshKey++;
           });
         },
         backgroundColor: Colors.transparent,
@@ -355,20 +468,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
     );
 
-    // Call the actual API (POST /api/v1/search)
+    // Call the actual API
     try {
-      final response = await NexusApiService.search(
+      final results = await NexusApiService.semanticSearch(
         query: query,
         topK: 15,
-        synthesize: true,
       );
-
+      
       if (mounted) {
         Navigator.pop(context);
-
-        if (response != null && response.allItems.isNotEmpty) {
-          _showSearchResults(response.allItems);
+        
+        if (results != null && results.isNotEmpty) {
+          // Show results dialog
+          _showSearchResults(results);
         } else {
+          // Show no results message
           _showNoResultsDialog();
         }
       }
@@ -386,7 +500,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
-  void _showSearchResults(List<SearchResultItem> items) {
+  void _showSearchResults(List<Map<String, dynamic>> results) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -399,24 +513,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           width: double.maxFinite,
           child: ListView.builder(
             shrinkWrap: true,
-            itemCount: items.length,
+            itemCount: results.length,
             itemBuilder: (context, index) {
-              final item = items[index];
+              final item = results[index];
               return Card(
                 color: const Color(0xFF334155),
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   leading: const Icon(Icons.check_circle, color: Color(0xFF10B981)),
                   title: Text(
-                    item.name,
+                    item['name'] ?? 'Item ${index + 1}',
                     style: const TextStyle(color: Colors.white),
                   ),
                   subtitle: Text(
-                    item.category ?? 'Unknown category',
+                    item['category'] ?? 'Unknown category',
                     style: const TextStyle(color: Color(0xFF94A3B8)),
                   ),
                   trailing: Text(
-                    '${(item.score * 100).toStringAsFixed(0)}%',
+                    '${((item['similarity'] ?? 0) * 100).toStringAsFixed(0)}%',
                     style: const TextStyle(color: Color(0xFF6366F1)),
                   ),
                 ),
@@ -482,47 +596,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
 
-// Items Grid View — loads real items from GET /api/v1/items, refetches when tab is selected.
-class ItemsGridView extends StatefulWidget {
+// Items Grid View
+class ItemsGridView extends StatelessWidget {
   const ItemsGridView({super.key});
-
-  @override
-  State<ItemsGridView> createState() => _ItemsGridViewState();
-}
-
-class _ItemsGridViewState extends State<ItemsGridView> {
-  List<VaultItem> _items = [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadItems();
-  }
-
-  Future<void> _loadItems() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final items = await NexusApiService.fetchManifestItems(limit: 100);
-      if (mounted) {
-        setState(() {
-          _items = items;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -533,10 +609,10 @@ class _ItemsGridViewState extends State<ItemsGridView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
+              const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Your Collection',
                     style: TextStyle(
                       fontSize: 20,
@@ -544,12 +620,10 @@ class _ItemsGridViewState extends State<ItemsGridView> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Text(
-                    _loading
-                        ? 'Loading...'
-                        : '${_items.length} items indexed',
-                    style: const TextStyle(
+                    '48 items indexed',
+                    style: TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 14,
                     ),
@@ -577,85 +651,23 @@ class _ItemsGridViewState extends State<ItemsGridView> {
           ),
         ),
         Expanded(
-          child: _buildContent(),
+          child: _buildItemsGrid(),
         ),
       ],
     );
   }
 
-  Widget _buildContent() {
-    if (_loading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Color(0xFF6366F1)),
-            SizedBox(height: 16),
-            Text(
-              'Loading your collection...',
-              style: TextStyle(color: Color(0xFF94A3B8)),
-            ),
-          ],
-        ),
-      );
-    }
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
-              const SizedBox(height: 16),
-              const Text(
-                "Couldn't load items",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _loadItems,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    if (_items.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[600]),
-              const SizedBox(height: 16),
-              const Text(
-                'No items yet.',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Use Scan to add your first item.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF94A3B8)),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+  Widget _buildItemsGrid() {
+    // Sample data - replace with actual API data
+    final items = List.generate(
+      12,
+      (index) => {
+        'name': _getItemName(index),
+        'category': _getCategory(index),
+        'similarity': (85 + (index * 2)) % 100,
+      },
+    );
+
     return GridView.builder(
       padding: const EdgeInsets.all(20),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -664,13 +676,15 @@ class _ItemsGridViewState extends State<ItemsGridView> {
         mainAxisSpacing: 16,
         childAspectRatio: 0.85,
       ),
-      itemCount: _items.length,
-      itemBuilder: (context, index) => _buildItemCard(_items[index]),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _buildItemCard(item);
+      },
     );
   }
 
-  Widget _buildItemCard(VaultItem item) {
-    final categoryLabel = item.category ?? item.domain;
+  Widget _buildItemCard(Map<String, dynamic> item) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
@@ -692,33 +706,13 @@ class _ItemsGridViewState extends State<ItemsGridView> {
                   topRight: Radius.circular(16),
                 ),
               ),
-              child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
-                      child: Image.network(
-                        item.imageUrl!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Icon(
-                            _getCategoryIcon(categoryLabel),
-                            size: 48,
-                            color: const Color(0xFF6366F1),
-                          ),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Icon(
-                        _getCategoryIcon(categoryLabel),
-                        size: 48,
-                        color: const Color(0xFF6366F1),
-                      ),
-                    ),
+              child: Center(
+                child: Icon(
+                  _getCategoryIcon(item['category'] as String),
+                  size: 48,
+                  color: const Color(0xFF6366F1),
+                ),
+              ),
             ),
           ),
           Padding(
@@ -727,7 +721,7 @@ class _ItemsGridViewState extends State<ItemsGridView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.name,
+                  item['name'] as String,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -742,11 +736,11 @@ class _ItemsGridViewState extends State<ItemsGridView> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color.fromRGBO(99, 102, 241, 0.2),
+                        color: const Color.fromRGBO(255, 99, 102, 0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        categoryLabel,
+                        item['category'] as String,
                         style: const TextStyle(
                           color: Color(0xFF6366F1),
                           fontSize: 10,
@@ -764,19 +758,50 @@ class _ItemsGridViewState extends State<ItemsGridView> {
     );
   }
 
-  static IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'clothing':
+  String _getItemName(int index) {
+    final names = [
+      'Wool Trench Coat',
+      'First Aid Kit',
+      'LED Flashlight',
+      'Thermal Blanket',
+      'Gore-Tex Jacket',
+      'Antibiotics',
+      'Camp Stove',
+      'Water Filter',
+      'Trauma Kit',
+      'Sleeping Bag',
+      'Gauze Pack',
+      'Multi-tool',
+    ];
+    return names[index % names.length];
+  }
+
+  String _getCategory(int index) {
+    final categories = [
+      'Clothing',
+      'Medical',
+      'Survival',
+      'Medical',
+      'Clothing',
+      'Medical',
+      'Survival',
+      'Survival',
+      'Medical',
+      'Survival',
+      'Medical',
+      'Survival',
+    ];
+    return categories[index % categories.length];
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Clothing':
         return Icons.checkroom;
-      case 'medical':
+      case 'Medical':
         return Icons.medical_services_outlined;
-      case 'survival':
-      case 'camping':
+      case 'Survival':
         return Icons.outdoor_grill_outlined;
-      case 'tech':
-        return Icons.devices;
-      case 'food':
-        return Icons.restaurant;
       default:
         return Icons.category;
     }
@@ -793,6 +818,7 @@ class CameraIngestView extends StatefulWidget {
 
 class _CameraIngestViewState extends State<CameraIngestView> {
   bool _isProcessing = false;
+  String? _selectedImagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -814,7 +840,9 @@ class _CameraIngestViewState extends State<CameraIngestView> {
             ),
             child: _isProcessing
                 ? _buildProcessingState()
-                : _buildCameraPlaceholder(),
+                : (_selectedImagePath != null
+                    ? _buildImagePreview()
+                    : _buildCameraPlaceholder()),
           ),
           const SizedBox(height: 24),
           const Text(
@@ -994,84 +1022,135 @@ class _CameraIngestViewState extends State<CameraIngestView> {
     );
   }
 
-  void _captureImage() async {
-    // TODO: Integrate camera package
-    // For now, this is a placeholder for camera integration
-    // Uncomment when camera package is added to pubspec.yaml
-    
-    /*
-    final cameras = await availableCameras();
-    final firstCamera = cameras.first;
-    
-    final image = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TakePictureScreen(camera: firstCamera),
-      ),
-    );
-    
-    if (image != null) {
-      await _processAndIngestImage(image.path);
-    }
-    */
-    
-    // Temporary: Show dialog to explain camera integration is pending
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
-          'Camera Integration',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Camera capture requires the camera package.\n\n'
-          'To enable:\n'
-          '1. Add "camera: ^0.10.5" to pubspec.yaml\n'
-          '2. Implement camera capture screen\n'
-          '3. Test on physical device',
-          style: TextStyle(color: Color(0xFF94A3B8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+  Widget _buildImagePreview() {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Image.file(
+            File(_selectedImagePath!),
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
           ),
-        ],
-      ),
+        ),
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _selectedImagePath = null;
+                });
+              },
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 12,
+          left: 12,
+          right: 12,
+          child: ElevatedButton(
+            onPressed: () => _processAndIngestImage(_selectedImagePath!),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.upload),
+                SizedBox(width: 8),
+                Text(
+                  'Process & Upload',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
+  }
+
+  void _captureImage() async {
+    final ImagePicker picker = ImagePicker();
+    
+    try {
+      // Capture image from camera
+      final XFile? photo = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (photo != null) {
+        setState(() {
+          _selectedImagePath = photo.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('Camera error: $e');
+      }
+    }
   }
 
   void _pickFromGallery() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-    if (image != null && mounted) {
-      await _processAndIngestImage(image);
+    
+    try {
+      // Pick image from gallery
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedImagePath = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('Gallery error: $e');
+      }
     }
   }
 
-  /// Process and ingest image: upload to Supabase Storage, then POST /api/v1/ingest with image_url.
-  Future<void> _processAndIngestImage(XFile imageFile) async {
+  /// Process and ingest image to backend
+  Future<void> _processAndIngestImage(String imagePath) async {
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      final bytes = await imageFile.readAsBytes();
-      final name = imageFile.name;
-      final ext = name.contains('.') ? name.split('.').last : 'jpg';
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
-      final imageUrl = await uploadImageToStorage(fileName, bytes);
-
-      final result = await NexusApiService.ingestByUrl(
-        imageUrl: imageUrl,
-        userId: 'demo_user',
+      // Call the API to ingest the image
+      final result = await NexusApiService.ingestImage(
+        imagePath: imagePath,
+        userId: 'demo_user', // TODO: Replace with actual user ID from auth
       );
 
       if (mounted) {
         setState(() {
           _isProcessing = false;
+          _selectedImagePath = null; // Clear preview after upload
         });
 
         if (result != null) {
@@ -1080,19 +1159,11 @@ class _CameraIngestViewState extends State<CameraIngestView> {
           _showErrorDialog('Failed to process image. Please try again.');
         }
       }
-    } on DioException catch (e) {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        if (e.type == DioExceptionType.connectionError ||
-            e.type == DioExceptionType.connectionTimeout) {
-          _showErrorDialog('Cannot reach AI server. Is the backend running at API_BASE_URL?');
-        } else {
-          _showErrorDialog('Error: $e');
-        }
-      }
     } catch (e) {
       if (mounted) {
-        setState(() => _isProcessing = false);
+        setState(() {
+          _isProcessing = false;
+        });
         _showErrorDialog('Error: $e');
       }
     }
@@ -1132,7 +1203,7 @@ class _CameraIngestViewState extends State<CameraIngestView> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Vector embedding created and stored.',
+              'Vector embedding created and stored in Pinecone',
               style: TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 14,
@@ -1174,8 +1245,6 @@ class _CameraIngestViewState extends State<CameraIngestView> {
     );
       }
     }
-  
-
 
 // Graph Visualization View
 class GraphVisualizationView extends StatelessWidget {
