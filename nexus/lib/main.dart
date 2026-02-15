@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'api_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -19,18 +20,12 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
-        cardTheme: const CardThemeData(
-  color: Color(0xFF1E293B),
-  elevation: 0,
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.all(Radius.circular(16)),
-  ),
-),
       ),
       home: const HomePage(),
     );
   }
 }
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -279,8 +274,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  void _performSemanticSearch(String query) {
-    // API integration point for POST /api/search/semantic
+  void _performSemanticSearch(String query) async {
     setState(() {
       _isSearching = true;
     });
@@ -309,13 +303,133 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
     );
 
-    // Simulate API call - replace with actual API integration
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context);
-      // Show results
-    });
+    // Call the actual API
+    try {
+      final results = await NexusApiService.semanticSearch(
+        query: query,
+        topK: 15,
+      );
+      
+      if (mounted) {
+        Navigator.pop(context);
+        
+        if (results != null && results.isNotEmpty) {
+          // Show results dialog
+          _showSearchResults(results);
+        } else {
+          // Show no results message
+          _showNoResultsDialog();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        _showErrorDialog('Search failed: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+      }
+    }
   }
-}
+
+  void _showSearchResults(List<Map<String, dynamic>> results) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'Search Results',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: results.length,
+            itemBuilder: (context, index) {
+              final item = results[index];
+              return Card(
+                color: const Color(0xFF334155),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.check_circle, color: Color(0xFF10B981)),
+                  title: Text(
+                    item['name'] ?? 'Item ${index + 1}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    item['category'] ?? 'Unknown category',
+                    style: const TextStyle(color: Color(0xFF94A3B8)),
+                  ),
+                  trailing: Text(
+                    '${((item['similarity'] ?? 0) * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(color: Color(0xFF6366F1)),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNoResultsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'No Results',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'No items found matching your search criteria.',
+          style: TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'Error',
+          style: TextStyle(color: Color(0xFFEF4444)),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    }
+  }
+
 
 // Items Grid View
 class ItemsGridView extends StatelessWidget {
@@ -740,37 +854,127 @@ class _CameraIngestViewState extends State<CameraIngestView> {
     );
   }
 
-  void _captureImage() {
-    // Camera package integration point
-    setState(() {
-      _isProcessing = true;
-    });
-
-    // Simulate processing - replace with actual API call
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-        _showSuccessDialog();
-      }
-    });
+  void _captureImage() async {
+    // TODO: Integrate camera package
+    // For now, this is a placeholder for camera integration
+    // Uncomment when camera package is added to pubspec.yaml
+    
+    /*
+    final cameras = await availableCameras();
+    final firstCamera = cameras.first;
+    
+    final image = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TakePictureScreen(camera: firstCamera),
+      ),
+    );
+    
+    if (image != null) {
+      await _processAndIngestImage(image.path);
+    }
+    */
+    
+    // Temporary: Show dialog to explain camera integration is pending
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'Camera Integration',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Camera capture requires the camera package.\n\n'
+          'To enable:\n'
+          '1. Add "camera: ^0.10.5" to pubspec.yaml\n'
+          '2. Implement camera capture screen\n'
+          '3. Test on physical device',
+          style: TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _pickFromGallery() {
-    // Image picker integration point
+  void _pickFromGallery() async {
+    // TODO: Integrate image_picker package
+    // For now, this is a placeholder for image picker integration
+    // Uncomment when image_picker package is added to pubspec.yaml
+    
+    /*
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (image != null) {
+      await _processAndIngestImage(image.path);
+    }
+    */
+    
+    // Temporary: Show dialog to explain image picker integration is pending
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'Image Picker Integration',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Gallery picker requires the image_picker package.\n\n'
+          'To enable:\n'
+          '1. Add "image_picker: ^1.0.4" to pubspec.yaml\n'
+          '2. Configure platform permissions\n'
+          '3. Test image selection',
+          style: TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Process and ingest image to backend
+  Future<void> _processAndIngestImage(String imagePath) async {
     setState(() {
       _isProcessing = true;
     });
 
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      // Call the API to ingest the image
+      final result = await NexusApiService.ingestImage(
+        imagePath: imagePath,
+        userId: 'demo_user', // TODO: Replace with actual user ID from auth
+      );
+
       if (mounted) {
         setState(() {
           _isProcessing = false;
         });
-        _showSuccessDialog();
+
+        if (result != null) {
+          _showSuccessDialog();
+        } else {
+          _showErrorDialog('Failed to process image. Please try again.');
+        }
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        _showErrorDialog('Error: $e');
+      }
+    }
   }
 
   void _showSuccessDialog() {
@@ -825,7 +1029,32 @@ class _CameraIngestViewState extends State<CameraIngestView> {
       ),
     );
   }
-}
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'Error',
+          style: TextStyle(color: Color(0xFFEF4444)),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+      }
+    }
+  
+
 
 // Graph Visualization View
 class GraphVisualizationView extends StatelessWidget {
