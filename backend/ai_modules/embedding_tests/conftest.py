@@ -24,11 +24,25 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from _import_helper import models
+import os
+from _import_helper import models, config, load_module
 
 ItemContext = models.ItemContext
 EmbeddingResult = models.EmbeddingResult
 RetrievedItem = models.RetrievedItem
+
+# ---------------------------------------------------------------------------
+# Refresh config module attributes if .env was loaded after config import.
+# config.py reads os.getenv() at import time — if .env wasn't loaded yet,
+# the module-level variables are empty strings. Patch them from os.environ.
+# ---------------------------------------------------------------------------
+if os.getenv("OPENAI_API_KEY") and not config.OPENAI_API_KEY:
+    config.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("OPEN_AI_KEY") or ""
+    config.VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
+    config.SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    config.SUPABASE_SERVICE_KEY = (
+        os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY") or ""
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -269,3 +283,58 @@ def mock_extractor(clothing_context):
 def test_image_bytes():
     """Minimal valid PNG bytes for use in tests."""
     return TINY_PNG
+
+
+# ===================================================================
+# Real test images directory
+# ===================================================================
+REAL_IMAGES_DIR = Path(__file__).resolve().parent.parent / "test_images"
+
+
+@pytest.fixture(scope="session")
+def real_categorized_images():
+    """Real test images from ai_modules/test_images/ (session-scoped)."""
+    if not REAL_IMAGES_DIR.exists():
+        return {}
+    result = {}
+    for category in ["clothing", "medical", "tech", "camping"]:
+        cat_dir = REAL_IMAGES_DIR / category
+        if cat_dir.exists():
+            imgs = [
+                str(p)
+                for p in sorted(cat_dir.iterdir())
+                if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            ]
+            if imgs:
+                result[category] = imgs
+    return result
+
+
+# ===================================================================
+# Session-scoped live service fixtures (skip if keys missing)
+# ===================================================================
+@pytest.fixture(scope="session")
+def live_extractor():
+    """Real ContextExtractor — only usable when OPENAI_API_KEY is set."""
+    if not os.getenv("OPENAI_API_KEY"):
+        pytest.skip("OPENAI_API_KEY not set")
+    extractor_mod = load_module("context_extractor")
+    return extractor_mod.ContextExtractor()
+
+
+@pytest.fixture(scope="session")
+def live_embedder():
+    """Real VoyageEmbedder — only usable when VOYAGE_API_KEY is set."""
+    if not os.getenv("VOYAGE_API_KEY"):
+        pytest.skip("VOYAGE_API_KEY not set")
+    engine_mod = load_module("embedding_engine")
+    return engine_mod.VoyageEmbedder()
+
+
+@pytest.fixture(scope="session")
+def live_store():
+    """Real SupabaseVectorStore — only usable when Supabase keys are set."""
+    if not (os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY")):
+        pytest.skip("SUPABASE_URL/SUPABASE_SERVICE_KEY not set")
+    store_mod = load_module("vector_store")
+    return store_mod.SupabaseVectorStore()
