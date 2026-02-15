@@ -1135,17 +1135,25 @@ class _CameraIngestViewState extends State<CameraIngestView> {
   }
 
   /// Process and ingest image to backend
+  /// NEW: First uploads to Supabase Storage, then sends URL to backend
   Future<void> _processAndIngestImage(String imagePath) async {
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      // Call the API to ingest the image
+      // Step 1: Upload image to Supabase Storage
+      final imageUrl = await NexusApiService.uploadImageToStorage(imagePath);
+      
+      if (imageUrl == null) {
+        throw Exception('Failed to upload image to storage');
+      }
+
+      // Step 2: Send image URL to backend for AI processing
       final result = await NexusApiService.ingestImage(
-        imagePath: imagePath,
-        userId: 'demo_user', // TODO: Replace with actual user ID from auth
-      );
+  imageUrl: imageUrl,  // Changed from imagePath to imageUrl
+  userId: 'demo_user',
+);
 
       if (mounted) {
         setState(() {

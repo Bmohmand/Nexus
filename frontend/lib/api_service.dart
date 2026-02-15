@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io'; 
 import 'package:http/http.dart' as http;
 import 'supabase_config.dart';
 
@@ -15,34 +16,35 @@ class NexusApiService {
 
   /// Upload image to backend for ingestion
   /// POST /api/v1/ingest
-  static Future<Map<String, dynamic>?> ingestImage({
-    required String imagePath,
-    String? userId,
-  }) async {
-    try {
-      final uri = Uri.parse('$backendUrl/api/v1/ingest');
-      
-      var request = http.MultipartRequest('POST', uri);
-      request.files.add(await http.MultipartFile.fromPath('image', imagePath));
-      
-      if (userId != null) {
-        request.fields['user_id'] = userId;
-      }
+  /// Upload image to backend for ingestion
+/// POST /api/v1/ingest (expects JSON with image_url)
+static Future<Map<String, dynamic>?> ingestImage({
+  required String imageUrl,  // Changed from imagePath to imageUrl
+  String? userId,
+}) async {
+  try {
+    final uri = Uri.parse('$backendUrl/api/v1/ingest');
+    
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'image_url': imageUrl,  // Send URL, not file
+        if (userId != null) 'user_id': userId,
+      }),
+    );
 
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        return json.decode(responseData);
-      } else {
-        print('Error ingesting image: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('Exception during image ingest: $e');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      print('Error ingesting image: ${response.statusCode} - ${response.body}');
       return null;
     }
+  } catch (e) {
+    print('Exception during image ingest: $e');
+    return null;
   }
+}
 
   /// Perform semantic search
   /// POST /api/v1/search
@@ -150,4 +152,36 @@ class NexusApiService {
       return false;
     }
   }
+
+  /// Upload image to Supabase Storage and return public URL
+  /// Upload image to Supabase Storage and return public URL
+static Future<String?> uploadImageToStorage(String imagePath) async {
+  try {
+    final file = File(imagePath);
+    final bytes = await file.readAsBytes();
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    
+    final response = await http.post(
+      Uri.parse('${SupabaseConfig.supabaseUrl}/storage/v1/object/manifest-assets/$fileName'),
+      headers: {
+        'apikey': SupabaseConfig.supabaseAnonKey,  // ADD THIS LINE
+        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+        'Content-Type': 'image/jpeg',
+      },
+      body: bytes,
+    );
+
+    print('Upload response: ${response.statusCode} - ${response.body}');  // ADD DEBUG
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/manifest-assets/$fileName';
+    } else {
+      print('Error uploading to storage: ${response.statusCode} - ${response.body}');
+      return null;
+    }
+  } catch (e) {
+    print('Exception uploading image: $e');
+    return null;
+  }
+}
 }
