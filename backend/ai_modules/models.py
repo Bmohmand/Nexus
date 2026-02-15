@@ -27,6 +27,26 @@ class ItemContext(BaseModel):
     compressibility: Optional[str] = Field(default=None, description="'highly_compressible', 'moderate', 'rigid'")
     quantity: int = Field(default=1, description="Number of this item available (for consumables like bandages, batteries)")
 
+    # --- Fields previously extracted by VLM but lost (not stored in ItemContext) ---
+    environmental_suitability: Optional[str] = Field(
+        default=None,
+        description="What climates/conditions is this designed for, e.g. 'Sub-zero temperatures', 'Arid desert', 'Sterile clinical'",
+    )
+    limitations_and_failure_modes: Optional[str] = Field(
+        default=None,
+        description="Critical limits: 'Useless when wet', 'Requires batteries', 'Melts at high heat'",
+    )
+
+    # --- New field: activity/scenario context for better embedding discrimination ---
+    activity_contexts: list[str] = Field(
+        default_factory=list,
+        description="Activities/scenarios this item suits: ['hiking', 'clinical_medicine', 'travel', 'emergency_response']",
+    )
+    unsuitable_contexts: list[str] = Field(
+        default_factory=list,
+        description="Activities/scenarios this item is NOT suited for: ['outdoor_recreation', 'water_sports']",
+    )
+
 
 class EmbeddingResult(BaseModel):
     """

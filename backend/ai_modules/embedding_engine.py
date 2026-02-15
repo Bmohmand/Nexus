@@ -126,7 +126,14 @@ class VoyageEmbedder(BaseEmbedder):
 
     @staticmethod
     def _build_context_text(ctx: ItemContext) -> str:
-        """Serialize the extracted context into an embedding-friendly text block."""
+        """
+        Serialize the extracted context into an embedding-friendly text block.
+
+        Includes ALL extracted fields so the embedding captures the full semantic
+        profile — physical properties, use-case suitability, AND negative signals
+        (what the item is NOT suited for). The negative signals are critical for
+        preventing irrelevant matches (e.g., stethoscope for a hiking trip).
+        """
         parts = [
             f"Item: {ctx.name}",
             f"Category: {ctx.inferred_category}",
@@ -140,6 +147,18 @@ class VoyageEmbedder(BaseEmbedder):
             parts.append(f"Water resistance: {ctx.water_resistance}")
         if ctx.medical_application:
             parts.append(f"Medical use: {ctx.medical_application}")
+        if ctx.durability:
+            parts.append(f"Durability: {ctx.durability}")
+        if ctx.compressibility:
+            parts.append(f"Compressibility: {ctx.compressibility}")
+        if ctx.environmental_suitability:
+            parts.append(f"Environment: {ctx.environmental_suitability}")
+        if ctx.limitations_and_failure_modes:
+            parts.append(f"Limitations: {ctx.limitations_and_failure_modes}")
+        if ctx.activity_contexts:
+            parts.append(f"Suited for: {', '.join(ctx.activity_contexts)}")
+        if ctx.unsuitable_contexts:
+            parts.append(f"Not suited for: {', '.join(ctx.unsuitable_contexts)}")
         if ctx.semantic_tags:
             parts.append(f"Tags: {', '.join(ctx.semantic_tags)}")
         return ". ".join(parts)
