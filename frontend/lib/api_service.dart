@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:io'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'supabase_config.dart';
 
 class NexusApiService {
   // Supabase client headers
   static Map<String, String> get _supabaseHeaders => {
-        'apikey': SupabaseConfig.supabaseAnonKey,
-        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+        'apikey': dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+        'Authorization': 'Bearer ${dotenv.env['SUPABASE_ANON_KEY'] ?? ''}',
         'Content-Type': 'application/json',
       };
 
@@ -83,7 +83,7 @@ static Future<Map<String, dynamic>?> ingestImage({
   }) async {
     try {
       final uri = Uri.parse(
-        '${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?user_id=eq.$userId&select=*',
+        '${dotenv.env['SUPABASE_URL']}/rest/v1/manifest_items?user_id=eq.$userId&select=*',
       );
 
       final response = await http.get(uri, headers: _supabaseHeaders);
@@ -107,7 +107,7 @@ static Future<Map<String, dynamic>?> ingestImage({
     required Map<String, dynamic> metadata,
   }) async {
     try {
-      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items');
+      final uri = Uri.parse('${dotenv.env['SUPABASE_URL']}/rest/v1/manifest_items');
 
       final response = await http.post(
         uri,
@@ -142,7 +142,7 @@ static Future<Map<String, dynamic>?> ingestImage({
   /// Supabase health check
   static Future<bool> supabaseHealthCheck() async {
     try {
-      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?select=id&limit=1');
+      final uri = Uri.parse('${dotenv.env['SUPABASE_URL']}/rest/v1/manifest_items?select=id&limit=1');
       final response = await http
           .get(uri, headers: _supabaseHeaders)
           .timeout(const Duration(seconds: 5));
@@ -162,10 +162,10 @@ static Future<String?> uploadImageToStorage(String imagePath) async {
     final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
     
     final response = await http.post(
-      Uri.parse('${SupabaseConfig.supabaseUrl}/storage/v1/object/manifest-assets/$fileName'),
+      Uri.parse('${dotenv.env['SUPABASE_URL']}/storage/v1/object/manifest-assets/$fileName'),
       headers: {
-        'apikey': SupabaseConfig.supabaseAnonKey,  // ADD THIS LINE
-        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+        'apikey': dotenv.env['SUPABASE_ANON_KEY'] ?? '',  // ADD THIS LINE
+        'Authorization': 'Bearer ${dotenv.env['SUPABASE_ANON_KEY'] ?? ''}',
         'Content-Type': 'image/jpeg',
       },
       body: bytes,
@@ -174,7 +174,7 @@ static Future<String?> uploadImageToStorage(String imagePath) async {
     print('Upload response: ${response.statusCode} - ${response.body}');  // ADD DEBUG
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      return '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/manifest-assets/$fileName';
+      return '${dotenv.env['SUPABASE_URL']}/storage/v1/object/public/manifest-assets/$fileName';
     } else {
       print('Error uploading to storage: ${response.statusCode} - ${response.body}');
       return null;
