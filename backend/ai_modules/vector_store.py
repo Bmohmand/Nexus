@@ -120,15 +120,15 @@ class SupabaseVectorStore:
         Returns:
             List of RetrievedItem sorted by similarity (highest first)
         """
-        response = self.client.rpc(
-            RPC_NAME,
-            {
-                "query_embedding": query_vector,
-                "match_count": top_k,
-                "filter_category": category_filter,
-                "filter_user_id": user_id,
-            },
-        ).execute()
+        params = {
+            "query_embedding": query_vector,
+            "match_count": top_k,
+            "filter_category": category_filter,
+        }
+        if user_id is not None:
+            params["filter_user_id"] = user_id
+
+        response = self.client.rpc(RPC_NAME, params).execute()
 
         items = []
         for row in response.data:

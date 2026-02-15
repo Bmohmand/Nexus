@@ -7,6 +7,7 @@ from the vector store, optionally synthesized into a mission plan by the LLM.
 """
 
 import logging
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..dependencies import get_pipeline
@@ -49,12 +50,20 @@ async def search_items(
     try:
         logger.info(f"Search: '{request.query[:80]}' | top_k={request.top_k} | synthesize={request.synthesize}")
 
+        # Validate user_id as UUID; discard invalid values (e.g. Swagger placeholder "string")
+        user_id = request.user_id
+        if user_id is not None:
+            try:
+                uuid.UUID(user_id)
+            except (ValueError, TypeError):
+                user_id = None
+
         result = await pipeline.search(
             query=request.query,
             top_k=request.top_k,
             category_filter=request.category_filter,
             synthesize=request.synthesize,
-            user_id=request.user_id,
+            user_id=user_id,
         )
 
         if request.synthesize and isinstance(result, MissionPlan):
