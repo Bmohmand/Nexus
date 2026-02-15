@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Nexus - Physical World API',
+      title: 'NeXuS. - Physical World API',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -291,7 +291,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Nexus',
+                    'NeXuS.',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
