@@ -337,7 +337,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               controller: _searchController,
               style: const TextStyle(color: Colors.white, fontSize: 16),
               decoration: InputDecoration(
-                hintText: 'Describe your mission... (e.g., "3-week disaster relief in cold climate")',
+                hintText: 'Describe your mission...',
                 hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
                 prefixIcon: const Icon(Icons.search, color: Color(0xFF6366F1)),
                 suffixIcon: Row(
@@ -445,7 +445,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color.fromRGBO(255, 30, 41, 0.5),
+                color: const Color.fromARGB(128, 58, 252, 249),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color.fromRGBO(255, 99, 102, 0.3)),
               ),
@@ -1321,7 +1321,7 @@ class _CameraIngestViewState extends State<CameraIngestView> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color.fromRGBO(255, 30, 41, 0.5),
+              color: const Color.fromRGBO(128, 58, 252, 249),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Column(
@@ -1889,10 +1889,19 @@ if (embeddings.isEmpty) {
                 ],
               ),
             )
-          : Stack(
-              children: [
-                // 3D Graph
-                GestureDetector(
+          : RefreshIndicator(
+    onRefresh: () async {
+      setState(() {
+        _isLoading = true;
+        _nodes = [];
+      });
+      await _loadGraphData();
+    },
+    color: const Color(0xFF6366F1),
+    child: Stack(
+      children: [
+        // 3D Graph
+        GestureDetector(
                   onPanUpdate: (details) {
                     setState(() {
                       _rotationY += details.delta.dx * 0.01;
@@ -1972,41 +1981,42 @@ Positioned(
                 ),
               ],
             ),
+          ),
     );
   }
 
   Widget _buildLegendItem(String label, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.5),
-                  blurRadius: 8,
-                ),
-              ],
-            ),
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.5),
+                blurRadius: 6,
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-            ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 }
 
 // Graph Node Model

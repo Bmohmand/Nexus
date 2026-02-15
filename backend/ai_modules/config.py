@@ -59,7 +59,7 @@ SYNTHESIS_MAX_TOKENS: int = 4000
 
 # GPT-5 reasoning effort per pipeline stage (minimal, low, medium, high)
 # Higher effort = better accuracy, more tokens, higher cost
-REASONING_EFFORT_EXTRACTION: str = "medium"   # Context extraction: worth thinking about materials/safety
+REASONING_EFFORT_EXTRACTION: str = "low"   # Context extraction: worth thinking about materials/safety
 REASONING_EFFORT_SYNTHESIS: str = "low"      # Mission plan: needs careful cross-domain reasoning
 
 # ---------------------------------------------------------------------------
