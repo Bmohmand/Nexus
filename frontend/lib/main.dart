@@ -44,6 +44,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  bool _explainResults = false;
   List<StorageContainer> _containers = [];
 
   @override
@@ -415,6 +416,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               const SizedBox(height: 8),
             ],
+            if (_containers.any((c) => c.isSelected))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.insights, color: Color(0xFF94A3B8), size: 16),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'AI insights',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    ),
+                    const Spacer(),
+                    SizedBox(
+                      height: 24,
+                      child: Switch(
+                        value: _explainResults,
+                        onChanged: (v) => setState(() => _explainResults = v),
+                        activeColor: const Color(0xFF6366F1),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -546,6 +571,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           query: query,
           containerIds: containerIds,
           topK: 30,
+          explain: _explainResults,
         );
 
         if (mounted) {
