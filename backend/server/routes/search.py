@@ -54,6 +54,7 @@ async def search_items(
             top_k=request.top_k,
             category_filter=request.category_filter,
             synthesize=request.synthesize,
+            user_id=request.user_id,
         )
 
         if request.synthesize and isinstance(result, MissionPlan):

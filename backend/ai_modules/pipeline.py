@@ -153,6 +153,7 @@ class NexusPipeline:
         top_k: int = 15,
         category_filter: Optional[str] = None,
         synthesize: bool = True,
+        user_id: Optional[str] = None,
     ) -> MissionPlan | list[RetrievedItem]:
         """
         Full search pipeline: query -> embed -> Supabase vector search -> synthesize.
@@ -166,6 +167,7 @@ class NexusPipeline:
             top_k: Number of nearest neighbors.
             category_filter: Optional category to restrict search.
             synthesize: If True, run LLM synthesis. If False, return raw results.
+            user_id: Optional user UUID to scope search to a specific user's items.
 
         Returns:
             MissionPlan (if synthesize=True) or list of RetrievedItem (if False).
@@ -182,6 +184,7 @@ class NexusPipeline:
             query_vector=query_vector,
             top_k=top_k,
             category_filter=category_filter,
+            user_id=user_id,
         )
         t1 = time.time()
         logger.info(f"Retrieved {len(retrieved)} items in {t1 - t0:.1f}s")
