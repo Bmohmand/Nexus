@@ -8,6 +8,7 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
 
 # Miscellaneous global ignores
 *.bak

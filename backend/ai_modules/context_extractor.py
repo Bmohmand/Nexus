@@ -35,7 +35,7 @@ Your goal is to analyze an image of a physical object and extract highly accurat
 Analyze the image thoroughly and return ONLY a valid JSON object matching the exact schema below. Do not use markdown blocks (e.g., ```json) or add conversational filler.
 
 {
-  "name": "Specific item name (e.g. 'Gore-Tex Rain Jacket')",
+  "name": "Short human-readable item name (e.g. 'Gore-Tex Rain Jacket', 'RL Reward Chart'). Include brand if visible.",
   "inferred_category": "One of: clothing, medical, tech, camping, food, misc",
   "primary_material": "Dominant material (e.g., 'Gore-Tex nylon', 'stainless steel', 'cotton')",
   "weight_estimate": "One of: ultralight, light, medium, heavy",
@@ -91,23 +91,30 @@ class ContextExtractor:
                     ],
                 },
             ],
-            max_completion_tokens=4000,
+            max_completion_tokens=4096,
             reasoning_effort=REASONING_EFFORT_EXTRACTION,
             response_format={"type": "json_object"},
         )
 
-        message = response.choices[0].message
-        if getattr(message, "refusal", None):
-            raise ValueError(f"Model refused the request: {message.refusal}")
-
-        raw = message.content
-        if not raw:
-            raise ValueError("Model returned empty content (possible safety refusal or internal error)")
-
+        msg = response.choices[0].message
+        raw = msg.content if msg.content is not None else ""
+        if not raw.strip():
+            refusal = getattr(msg, "refusal", None) or ""
+            logger.error(
+                "Extraction returned empty content (reasoning models use tokens for thinking first). "
+                "Refusal: %s",
+                refusal or "(none)",
+            )
+            raise ValueError(
+                "Context extraction returned empty response. "
+                "If using a reasoning model (e.g. gpt-5), try increasing max_completion_tokens or lower reasoning_effort."
+            )
         logger.info(f"Raw extraction: {raw[:200]}...")
 
         try:
             data = json.loads(raw)
+            if not data.get("name") or not str(data.get("name", "")).strip():
+                data["name"] = (data.get("utility_summary") or "Unnamed item")[:80]
             return ItemContext(**data)
         except (json.JSONDecodeError, Exception) as e:
             logger.error(f"Failed to parse extraction output: {e}\nRaw: {raw}")
