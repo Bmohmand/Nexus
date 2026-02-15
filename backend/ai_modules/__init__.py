@@ -30,6 +30,9 @@ from .knapsack_optimizer import (
     PackingResult,
     PackableItem,
     CONSTRAINT_PRESETS,
+    ContainerSpec,
+    ContainerResult,
+    MultiPackingResult,
 )
 from .models import (
     ItemContext,
@@ -48,6 +51,9 @@ __all__ = [
     "PackingResult",
     "PackableItem",
     "CONSTRAINT_PRESETS",
+    "ContainerSpec",
+    "ContainerResult",
+    "MultiPackingResult",
     "ItemContext",
     "EmbeddingResult",
     "SearchQuery",

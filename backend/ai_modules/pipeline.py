@@ -39,6 +39,8 @@ from .knapsack_optimizer import (
     PackingResult,
     PackableItem,
     CONSTRAINT_PRESETS,
+    ContainerSpec,
+    MultiPackingResult,
 )
 
 logger = logging.getLogger("nexus.pipeline")
@@ -369,6 +371,160 @@ class NexusPipeline:
             constraint_desc += f"- Relaxed: {result.relaxed_constraints}\n"
 
         # Let the LLM explain the optimizer's decisions
+        plan = await self.synthesizer.synthesize(
+            constraint_desc,
+            selected_retrieved + rejected_retrieved,
+        )
+
+        return result, plan
+
+    # -------------------------------------------------------------------
+    # FLOW 4: MULTI-CONTAINER PACK  --  Bin-packing across containers
+    # -------------------------------------------------------------------
+    async def pack_multi(
+        self,
+        query: str,
+        container_specs: list[ContainerSpec],
+        diversity_constraints: Optional[PackingConstraints] = None,
+        top_k: int = 30,
+        category_filter: Optional[str] = None,
+        inventory: Optional[dict[str, int]] = None,
+        weight_overrides: Optional[dict[str, float]] = None,
+    ) -> MultiPackingResult:
+        """
+        Multi-container packing: semantic search -> multi-knapsack optimization.
+
+        Distributes items across user-defined containers (luggage, drone
+        payloads, backpacks, etc.), respecting each container's weight limit.
+
+        Args:
+            query: Natural language mission description.
+            container_specs: List of ContainerSpec with per-container weight limits.
+            diversity_constraints: Optional category/tag diversity requirements
+                                   applied globally across all containers.
+            top_k: Candidate pool size from vector search.
+            category_filter: Optional category pre-filter.
+            inventory: {item_id: quantity_owned} map.
+            weight_overrides: {item_id: weight_grams} for known weights.
+
+        Returns:
+            MultiPackingResult with per-container item assignments.
+        """
+        t0 = time.time()
+
+        # Step 1: Vector search for candidates (reuses existing search)
+        logger.info(f"PackMulti: searching for {top_k} candidates...")
+        retrieved = await self.search(
+            query=query,
+            top_k=top_k,
+            category_filter=category_filter,
+            synthesize=False,
+        )
+
+        # Step 2: Convert to packable items (reuses existing conversion)
+        packable = KnapsackOptimizer.retrieved_to_packable(
+            items=retrieved,
+            inventory=inventory,
+            weight_overrides=weight_overrides,
+        )
+
+        # Step 3: Solve multi-container knapsack
+        container_names = ", ".join(f"{cs.name} ({cs.max_weight_grams/1000:.1f}kg)" for cs in container_specs)
+        logger.info(f"PackMulti: solving across {len(container_specs)} containers: {container_names}")
+        result = self.optimizer.solve_multi(packable, container_specs, diversity_constraints)
+
+        t1 = time.time()
+        logger.info(f"PackMulti complete in {(t1 - t0) * 1000:.0f}ms total")
+        return result
+
+    async def pack_multi_and_explain(
+        self,
+        query: str,
+        container_specs: list[ContainerSpec],
+        diversity_constraints: Optional[PackingConstraints] = None,
+        top_k: int = 30,
+        category_filter: Optional[str] = None,
+    ) -> tuple[MultiPackingResult, MissionPlan]:
+        """
+        Multi-container packing with LLM explanation.
+
+        Runs the multi-knapsack solver first, then passes the results to the
+        LLM synthesizer for a natural language explanation of the packing
+        decisions across all containers.
+
+        Returns:
+            (MultiPackingResult, MissionPlan) — per-container math AND the story.
+        """
+        result = await self.pack_multi(
+            query=query,
+            container_specs=container_specs,
+            diversity_constraints=diversity_constraints,
+            top_k=top_k,
+            category_filter=category_filter,
+        )
+
+        if result.status == "infeasible":
+            plan = MissionPlan(
+                mission_summary=f"Unable to satisfy constraints for: {query}",
+                selected_items=[],
+                reasoning={},
+                warnings=result.relaxed_constraints + [
+                    "The optimizer could not find a feasible solution. "
+                    "Try increasing container capacities or relaxing diversity constraints."
+                ],
+                rejected_items=[],
+            )
+            return result, plan
+
+        # Build RetrievedItems for the synthesizer, annotated with container info
+        selected_retrieved = []
+        for cr in result.container_results:
+            for item, qty in cr.packed_items:
+                selected_retrieved.append(RetrievedItem(
+                    item_id=item.item_id,
+                    score=item.similarity_score,
+                    context=ItemContext(
+                        name=(
+                            f"{item.name} (x{qty}, in {cr.container_name})"
+                            if qty > 1
+                            else f"{item.name} (in {cr.container_name})"
+                        ),
+                        inferred_category=item.category,
+                        utility_summary=(
+                            f"Packed {qty} unit(s) into '{cr.container_name}', "
+                            f"{item.weight_grams * qty:.0f}g"
+                        ),
+                        semantic_tags=item.semantic_tags,
+                    ),
+                ))
+
+        rejected_retrieved = []
+        for item in result.unpacked_items[:10]:
+            rejected_retrieved.append(RetrievedItem(
+                item_id=item.item_id,
+                score=item.similarity_score,
+                context=ItemContext(
+                    name=item.name,
+                    inferred_category=item.category,
+                    utility_summary="Not selected by optimizer",
+                    semantic_tags=item.semantic_tags,
+                ),
+            ))
+
+        # Build constraint description for the LLM
+        container_desc = "\n".join(
+            f"  - {cs.name}: {cs.max_weight_grams / 1000:.1f} kg capacity"
+            for cs in container_specs
+        )
+        constraint_desc = (
+            f"{query}\n\n"
+            f"CONTAINERS:\n{container_desc}\n\n"
+            f"RESULT: {result.total_weight_grams / 1000:.1f} kg total across "
+            f"{len(container_specs)} container(s)\n"
+        )
+        if result.relaxed_constraints:
+            constraint_desc += f"RELAXED: {result.relaxed_constraints}\n"
+
         plan = await self.synthesizer.synthesize(
             constraint_desc,
             selected_retrieved + rejected_retrieved,

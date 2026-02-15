@@ -1,3 +1,3 @@
-from . import ingest, search, pack, items
+from . import ingest, search, pack, items, containers
 
-__all__ = ["ingest", "search", "pack", "items"]
+__all__ = ["ingest", "search", "pack", "items", "containers"]

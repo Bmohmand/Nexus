@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .dependencies import get_pipeline
-from .routes import ingest, search, pack, items
+from .routes import ingest, search, pack, items, containers
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -77,6 +77,7 @@ app.include_router(ingest.router, prefix="/api/v1", tags=["Ingest"])
 app.include_router(search.router, prefix="/api/v1", tags=["Search"])
 app.include_router(pack.router, prefix="/api/v1", tags=["Pack"])
 app.include_router(items.router, prefix="/api/v1", tags=["Items"])
+app.include_router(containers.router, prefix="/api/v1", tags=["Containers"])
 
 
 @app.get("/health")

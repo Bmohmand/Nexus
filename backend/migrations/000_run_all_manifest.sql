@@ -196,3 +196,33 @@ create policy "Allow deletes from manifest-assets" on storage.objects for delete
 -- 10. Allow nullable user_id (so ingest works without sending user_id)
 -- ============================================================================
 alter table manifest_items alter column user_id drop not null;
+
+-- ============================================================================
+-- 11. Storage Containers (transport vessels for multi-container bin-packing)
+-- ============================================================================
+create table if not exists storage_containers (
+  id                  uuid default uuid_generate_v4() primary key,
+  user_id             uuid references auth.users(id) on delete cascade,
+  name                text not null,
+  description         text,
+  container_type      text default 'bag',
+  max_weight_grams    float not null default 20000,
+  max_volume_liters   float,
+  tare_weight_grams   float default 0,
+  quantity            int default 1 check (quantity >= 1),
+  is_default          boolean default false,
+  icon                text,
+  color               text,
+  created_at          timestamp with time zone default now(),
+  updated_at          timestamp with time zone default now()
+);
+create index if not exists idx_storage_containers_user_id on storage_containers(user_id);
+
+alter table mission_items
+  add column if not exists container_id uuid references storage_containers(id) on delete set null;
+create index if not exists idx_mission_items_container_id on mission_items(container_id);
+
+alter table storage_containers enable row level security;
+drop policy if exists "Users manage own containers" on storage_containers;
+create policy "Users manage own containers" on storage_containers for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);

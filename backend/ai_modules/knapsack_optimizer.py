@@ -94,6 +94,40 @@ class PackingResult:
 
 
 # ---------------------------------------------------------------------------
+# Multi-container (bin-packing) data structures
+# ---------------------------------------------------------------------------
+@dataclass
+class ContainerSpec:
+    """A physical container with its own weight limit."""
+    container_id: str
+    name: str
+    max_weight_grams: float
+
+
+@dataclass
+class ContainerResult:
+    """Packing result for a single container."""
+    container_id: str
+    container_name: str
+    max_weight_grams: float
+    packed_items: list[tuple[PackableItem, int]]  # (item, qty_in_this_container)
+    total_weight_grams: float
+    weight_utilization: float
+
+
+@dataclass
+class MultiPackingResult:
+    """Output of the multi-container optimizer."""
+    container_results: list[ContainerResult]
+    total_weight_grams: float
+    total_similarity_score: float
+    status: str  # "optimal", "feasible", "infeasible"
+    solver_time_ms: float
+    unpacked_items: list[PackableItem] = field(default_factory=list)
+    relaxed_constraints: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Preset constraint profiles (for Noah's UI dropdown)
 # ---------------------------------------------------------------------------
 CONSTRAINT_PRESETS: dict[str, PackingConstraints] = {
@@ -338,6 +372,217 @@ class KnapsackOptimizer:
                 status="infeasible",
                 solver_time_ms=solve_time,
                 relaxed_constraints=relaxed + ["Problem is infeasible — try relaxing weight or diversity constraints"],
+            )
+
+    def solve_multi(
+        self,
+        items: list[PackableItem],
+        container_specs: list[ContainerSpec],
+        diversity_constraints: Optional[PackingConstraints] = None,
+    ) -> MultiPackingResult:
+        """
+        Solve the Multi-Knapsack (bin-packing) problem.
+
+        Distributes items across multiple containers, each with its own
+        weight limit. Diversity constraints are applied globally across
+        all containers combined.
+
+        Decision variables: x[i][j] = qty of item i in container j
+        Objective: MAXIMIZE sum(x[i][j] * similarity_score_i) for all i,j
+        Subject to:
+          - sum_j(x[i][j]) <= quantity_owned_i    (inventory)
+          - sum_i(x[i][j] * weight_i) <= max_weight_j  (per-container weight)
+          - diversity constraints applied across ALL containers combined
+        """
+        import time
+        t0 = time.time()
+
+        if not items or not container_specs:
+            return MultiPackingResult(
+                container_results=[],
+                unpacked_items=items or [],
+                total_weight_grams=0,
+                total_similarity_score=0,
+                status="infeasible",
+                solver_time_ms=0,
+            )
+
+        model = cp_model.CpModel()
+        n_items = len(items)
+        n_containers = len(container_specs)
+
+        max_per_item = (
+            diversity_constraints.max_per_item
+            if diversity_constraints and diversity_constraints.max_per_item is not None
+            else None
+        )
+
+        # ----- Decision variables: x[i,j] = qty of item i in container j -----
+        x = {}
+        for i in range(n_items):
+            for j in range(n_containers):
+                upper = items[i].quantity_owned
+                if max_per_item is not None:
+                    upper = min(upper, max_per_item)
+                x[i, j] = model.NewIntVar(0, upper, f"x_{i}_{j}")
+
+        # ----- Constraint 1: Inventory bound across all containers -----
+        for i in range(n_items):
+            upper = items[i].quantity_owned
+            if max_per_item is not None:
+                upper = min(upper, max_per_item)
+            model.Add(sum(x[i, j] for j in range(n_containers)) <= upper)
+
+        # ----- Constraint 2: Per-container weight limit -----
+        SCALE = 10
+        scaled_weights = [int(item.weight_grams * SCALE) for item in items]
+        for j, container in enumerate(container_specs):
+            scaled_max = int(container.max_weight_grams * SCALE)
+            model.Add(
+                sum(x[i, j] * scaled_weights[i] for i in range(n_items))
+                <= scaled_max
+            )
+
+        # ----- Constraint 3: Global diversity constraints -----
+        relaxed = []
+        if diversity_constraints:
+            # Category minimums (across all containers)
+            for cat, minimum in diversity_constraints.category_minimums.items():
+                indices = [i for i, item in enumerate(items) if item.category == cat]
+                if not indices:
+                    relaxed.append(f"No items available for category '{cat}' (need >={minimum})")
+                    continue
+                total_available = sum(items[i].quantity_owned for i in indices)
+                effective_min = min(minimum, total_available)
+                if effective_min < minimum:
+                    relaxed.append(
+                        f"Category '{cat}': relaxed from >={minimum} to >={effective_min} "
+                        f"(only {total_available} available)"
+                    )
+                model.Add(
+                    sum(x[i, j] for i in indices for j in range(n_containers))
+                    >= effective_min
+                )
+
+            # Category maximums
+            for cat, maximum in diversity_constraints.category_maximums.items():
+                indices = [i for i, item in enumerate(items) if item.category == cat]
+                if indices:
+                    model.Add(
+                        sum(x[i, j] for i in indices for j in range(n_containers))
+                        <= maximum
+                    )
+
+            # Tag minimums
+            for tag, minimum in diversity_constraints.tag_minimums.items():
+                indices = [i for i, it in enumerate(items) if tag in it.semantic_tags]
+                if not indices:
+                    relaxed.append(f"No items available for tag '{tag}' (need >={minimum})")
+                    continue
+                total_available = sum(items[i].quantity_owned for i in indices)
+                effective_min = min(minimum, total_available)
+                if effective_min < minimum:
+                    relaxed.append(
+                        f"Tag '{tag}': relaxed from >={minimum} to >={effective_min} "
+                        f"(only {total_available} available)"
+                    )
+                model.Add(
+                    sum(x[i, j] for i in indices for j in range(n_containers))
+                    >= effective_min
+                )
+
+            # Pinned items
+            for pinned_id in diversity_constraints.pinned_items:
+                indices = [i for i, item in enumerate(items) if item.item_id == pinned_id]
+                if indices:
+                    model.Add(
+                        sum(x[i, j] for i in indices for j in range(n_containers))
+                        >= 1
+                    )
+                else:
+                    relaxed.append(f"Pinned item {pinned_id} not found in candidates")
+
+        # ----- Objective: Maximize total similarity -----
+        SCORE_SCALE = 10000
+        scaled_scores = [int(item.similarity_score * SCORE_SCALE) for item in items]
+        model.Maximize(
+            sum(
+                x[i, j] * scaled_scores[i]
+                for i in range(n_items)
+                for j in range(n_containers)
+            )
+        )
+
+        # ----- Solve -----
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = self.time_limit_seconds
+        status = solver.Solve(model)
+
+        solve_time = (time.time() - t0) * 1000
+
+        # ----- Extract results -----
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            container_results = []
+            total_weight = 0
+            total_score = 0
+            packed_item_indices = set()
+
+            for j, container in enumerate(container_specs):
+                packed = []
+                cw = 0
+                for i, item in enumerate(items):
+                    qty = solver.Value(x[i, j])
+                    if qty > 0:
+                        packed.append((item, qty))
+                        cw += item.weight_grams * qty
+                        total_score += item.similarity_score * qty
+                        packed_item_indices.add(i)
+
+                total_weight += cw
+                utilization = cw / container.max_weight_grams if container.max_weight_grams > 0 else 0
+
+                container_results.append(ContainerResult(
+                    container_id=container.container_id,
+                    container_name=container.name,
+                    max_weight_grams=container.max_weight_grams,
+                    packed_items=packed,
+                    total_weight_grams=cw,
+                    weight_utilization=utilization,
+                ))
+
+            unpacked = [items[i] for i in range(n_items) if i not in packed_item_indices]
+            status_str = "optimal" if status == cp_model.OPTIMAL else "feasible"
+
+            logger.info(
+                f"MultiSolver: {status_str} | "
+                f"{len(packed_item_indices)} items across {n_containers} containers | "
+                f"{total_weight:.0f}g total | "
+                f"score={total_score:.3f} | "
+                f"{solve_time:.1f}ms"
+            )
+
+            return MultiPackingResult(
+                container_results=container_results,
+                total_weight_grams=total_weight,
+                total_similarity_score=total_score,
+                status=status_str,
+                solver_time_ms=solve_time,
+                unpacked_items=unpacked,
+                relaxed_constraints=relaxed,
+            )
+        else:
+            logger.warning(f"MultiSolver: INFEASIBLE after {solve_time:.1f}ms")
+            return MultiPackingResult(
+                container_results=[],
+                unpacked_items=items,
+                total_weight_grams=0,
+                total_similarity_score=0,
+                status="infeasible",
+                solver_time_ms=solve_time,
+                relaxed_constraints=relaxed + [
+                    "Problem is infeasible — try increasing container capacities "
+                    "or relaxing diversity constraints"
+                ],
             )
 
     @staticmethod

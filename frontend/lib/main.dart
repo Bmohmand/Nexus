@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'api_service.dart';
+import 'models/storage_container.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,12 +44,27 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  List<StorageContainer> _containers = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _testConnections(); // Test backend and Supabase on startup
+    _loadContainers();
+  }
+
+  Future<void> _loadContainers() async {
+    final data = await NexusApiService.getContainers();
+    if (data != null && mounted) {
+      setState(() {
+        _containers = data.map((c) => StorageContainer.fromJson(c)).toList();
+        // Pre-select default containers
+        for (final c in _containers) {
+          c.isSelected = c.isDefault;
+        }
+      });
+    }
   }
 
   /// Test both backend and Supabase connections
@@ -236,6 +252,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   const ItemsGridView(),
                   const CameraIngestView(),
                   const GraphVisualizationView(),
+                  ContainersView(onContainersChanged: _loadContainers),
                 ],
               ),
             ),
@@ -358,6 +375,46 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ),
           if (_isSearching) ...[
             const SizedBox(height: 12),
+            if (_containers.isNotEmpty) ...[
+              SizedBox(
+                height: 40,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _containers.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final c = _containers[index];
+                    return FilterChip(
+                      label: Text(
+                        '${c.name} (${c.weightDisplayLbs})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: c.isSelected ? Colors.white : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      selected: c.isSelected,
+                      onSelected: (selected) {
+                        setState(() {
+                          c.isSelected = selected;
+                        });
+                      },
+                      avatar: Icon(
+                        Icons.luggage_outlined,
+                        size: 16,
+                        color: c.isSelected ? Colors.white : const Color(0xFF64748B),
+                      ),
+                      selectedColor: const Color(0xFF6366F1),
+                      backgroundColor: const Color(0xFF1E293B),
+                      side: BorderSide(
+                        color: c.isSelected ? const Color(0xFF6366F1) : const Color(0xFF334155),
+                      ),
+                      showCheckmark: false,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -365,14 +422,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color.fromRGBO(255, 99, 102, 0.3)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.auto_awesome, color: Color(0xFF6366F1), size: 16),
-                  SizedBox(width: 8),
+                  const Icon(Icons.auto_awesome, color: Color(0xFF6366F1), size: 16),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'AI-powered semantic search across all your items',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      _containers.any((c) => c.isSelected)
+                          ? 'AI will pack items into selected containers'
+                          : 'AI-powered semantic search across all your items',
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                     ),
                   ),
                 ],
@@ -417,6 +476,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             icon: Icon(Icons.scatter_plot_rounded),
             label: 'Graph',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.luggage_outlined),
+            label: 'Storage',
+          ),
         ],
       ),
     );
@@ -443,26 +506,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void _performSemanticSearch(String query) async {
+    final selectedContainers = _containers.where((c) => c.isSelected).toList();
+
     setState(() {
       _isSearching = true;
     });
-    
+
     // Show loading state
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
+      builder: (context) => Center(
         child: Card(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
                 Text(
-                  'Searching vector space...',
-                  style: TextStyle(color: Colors.white),
+                  selectedContainers.isNotEmpty
+                      ? 'Packing into ${selectedContainers.length} container(s)...'
+                      : 'Searching vector space...',
+                  style: const TextStyle(color: Colors.white),
                 ),
               ],
             ),
@@ -471,22 +538,38 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
     );
 
-    // Call the actual API
     try {
-      final results = await NexusApiService.semanticSearch(
-        query: query,
-        topK: 15,
-      );
-      
-      if (mounted) {
-        Navigator.pop(context);
-        
-        if (results != null && results.isNotEmpty) {
-          // Show results dialog
-          _showSearchResults(results);
-        } else {
-          // Show no results message
-          _showNoResultsDialog();
+      if (selectedContainers.isNotEmpty) {
+        // Multi-container pack
+        final containerIds = selectedContainers.map((c) => c.id).toList();
+        final result = await NexusApiService.packMultiContainer(
+          query: query,
+          containerIds: containerIds,
+          topK: 30,
+        );
+
+        if (mounted) {
+          Navigator.pop(context);
+          if (result != null) {
+            _showMultiPackResults(result);
+          } else {
+            _showErrorDialog('Multi-container packing failed.');
+          }
+        }
+      } else {
+        // Regular semantic search
+        final results = await NexusApiService.semanticSearch(
+          query: query,
+          topK: 15,
+        );
+
+        if (mounted) {
+          Navigator.pop(context);
+          if (results != null && results.isNotEmpty) {
+            _showSearchResults(results);
+          } else {
+            _showNoResultsDialog();
+          }
         }
       }
     } catch (e) {
@@ -559,6 +642,159 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
               );
             },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMultiPackResults(Map<String, dynamic> result) {
+    final containers = List<Map<String, dynamic>>.from(result['containers'] ?? []);
+    final warnings = List<String>.from(result['warnings'] ?? []);
+    final missionSummary = result['mission_summary'] as String?;
+    final status = result['status'] as String? ?? 'unknown';
+    final totalWeight = (result['total_weight_grams'] as num?)?.toDouble() ?? 0;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: Row(
+          children: [
+            Icon(
+              status == 'optimal' ? Icons.check_circle : Icons.warning_amber,
+              color: status == 'optimal' ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Pack Result (${(totalWeight / 453.592).toStringAsFixed(1)} lbs)',
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              if (missionSummary != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF334155),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    missionSummary,
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              ...containers.map((container) {
+                final cName = container['container_name'] as String? ?? 'Container';
+                final cMaxWeight = (container['max_weight_grams'] as num?)?.toDouble() ?? 0;
+                final cTotalWeight = (container['total_weight_grams'] as num?)?.toDouble() ?? 0;
+                final cUtilization = (container['weight_utilization'] as num?)?.toDouble() ?? 0;
+                final packedItems = List<Map<String, dynamic>>.from(container['packed_items'] ?? []);
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.luggage_outlined, color: Color(0xFF6366F1), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            cName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${(cTotalWeight / 453.592).toStringAsFixed(1)} / ${(cMaxWeight / 453.592).toStringAsFixed(1)} lbs',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: cUtilization.clamp(0.0, 1.0),
+                        backgroundColor: const Color(0xFF334155),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          cUtilization > 0.9 ? const Color(0xFFF59E0B) : const Color(0xFF6366F1),
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...packedItems.map((item) => Card(
+                          color: const Color(0xFF334155),
+                          margin: const EdgeInsets.only(bottom: 4),
+                          child: ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18),
+                            title: Text(
+                              '${item['name']} x${item['quantity'] ?? 1}',
+                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                            ),
+                            subtitle: Text(
+                              item['category'] ?? '',
+                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                            ),
+                            trailing: Text(
+                              '${((item['weight_grams'] as num? ?? 0) * (item['quantity'] as num? ?? 1) / 453.592).toStringAsFixed(1)} lbs',
+                              style: const TextStyle(color: Color(0xFF6366F1), fontSize: 11),
+                            ),
+                          ),
+                        )),
+                    if (packedItems.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'No items assigned to this container',
+                          style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                  ],
+                );
+              }),
+              if (warnings.isNotEmpty) ...[
+                const Divider(color: Color(0xFF334155)),
+                ...warnings.map((w) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.warning_amber, color: Color(0xFFF59E0B), size: 14),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              w,
+                              style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
+            ],
           ),
         ),
         actions: [
@@ -1565,6 +1801,420 @@ class GraphVisualizationView extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+// Storage Containers View
+class ContainersView extends StatefulWidget {
+  final VoidCallback? onContainersChanged;
+
+  const ContainersView({super.key, this.onContainersChanged});
+
+  @override
+  State<ContainersView> createState() => _ContainersViewState();
+}
+
+class _ContainersViewState extends State<ContainersView> {
+  List<StorageContainer> _containers = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchContainers();
+  }
+
+  Future<void> _fetchContainers() async {
+    setState(() => _isLoading = true);
+    final data = await NexusApiService.getContainers();
+    if (data != null && mounted) {
+      setState(() {
+        _containers = data.map((c) => StorageContainer.fromJson(c)).toList();
+        _isLoading = false;
+      });
+    } else if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showContainerForm({StorageContainer? existing}) {
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final descCtrl = TextEditingController(text: existing?.description ?? '');
+    final weightCtrl = TextEditingController(
+      text: existing != null
+          ? (existing.maxWeightGrams / 453.592).toStringAsFixed(1)
+          : '',
+    );
+    final qtyCtrl = TextEditingController(
+      text: existing?.quantity.toString() ?? '1',
+    );
+    String selectedType = existing?.containerType ?? 'bag';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: Text(
+            existing != null ? 'Edit Container' : 'Add Container',
+            style: const TextStyle(color: Colors.white),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                    hintText: 'e.g., Carry-on Luggage',
+                    hintStyle: TextStyle(color: Color(0xFF475569)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF334155)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF6366F1)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedType,
+                  dropdownColor: const Color(0xFF334155),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Type',
+                    labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF334155)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF6366F1)),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'bag', child: Text('Bag / Backpack')),
+                    DropdownMenuItem(value: 'case', child: Text('Case / Suitcase')),
+                    DropdownMenuItem(value: 'crate', child: Text('Crate / Box')),
+                    DropdownMenuItem(value: 'drone_payload', child: Text('Drone Payload')),
+                    DropdownMenuItem(value: 'vehicle', child: Text('Vehicle')),
+                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                  ],
+                  onChanged: (v) => setDialogState(() => selectedType = v ?? 'bag'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: weightCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Max Weight (lbs)',
+                    labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                    hintText: 'e.g., 15.0',
+                    hintStyle: TextStyle(color: Color(0xFF475569)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF334155)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF6366F1)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: qtyCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                    hintText: 'How many of this container?',
+                    hintStyle: TextStyle(color: Color(0xFF475569)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF334155)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF6366F1)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF334155)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF6366F1)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                final weightLbs = double.tryParse(weightCtrl.text.trim());
+                if (name.isEmpty || weightLbs == null || weightLbs <= 0) return;
+
+                final weightGrams = weightLbs * 453.592;
+                final qty = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                final desc = descCtrl.text.trim();
+
+                Navigator.pop(context);
+
+                if (existing != null) {
+                  await NexusApiService.updateContainer(
+                    containerId: existing.id,
+                    updates: {
+                      'name': name,
+                      'container_type': selectedType,
+                      'max_weight_grams': weightGrams,
+                      'quantity': qty,
+                      if (desc.isNotEmpty) 'description': desc,
+                    },
+                  );
+                } else {
+                  await NexusApiService.createContainer(
+                    containerData: {
+                      'name': name,
+                      'container_type': selectedType,
+                      'max_weight_grams': weightGrams,
+                      'quantity': qty,
+                      if (desc.isNotEmpty) 'description': desc,
+                    },
+                  );
+                }
+
+                _fetchContainers();
+                widget.onContainersChanged?.call();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+              ),
+              child: Text(existing != null ? 'Save' : 'Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _deleteContainer(StorageContainer container) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Delete Container?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Remove "${container.name}"? This cannot be undone.',
+          style: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await NexusApiService.deleteContainer(containerId: container.id);
+      _fetchContainers();
+      widget.onContainersChanged?.call();
+    }
+  }
+
+  IconData _getTypeIcon(String type) {
+    switch (type) {
+      case 'bag':
+        return Icons.backpack_outlined;
+      case 'case':
+        return Icons.luggage_outlined;
+      case 'crate':
+        return Icons.inventory_2_outlined;
+      case 'drone_payload':
+        return Icons.flight_outlined;
+      case 'vehicle':
+        return Icons.local_shipping_outlined;
+      default:
+        return Icons.category_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Storage Containers',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_containers.length} container(s) defined',
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _showContainerForm(),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _containers.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF334155),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.luggage_outlined,
+                              size: 64,
+                              color: Color(0xFF6366F1),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No containers yet',
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Add your luggage, backpacks, or drone payloads\nto enable smart packing',
+                            style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: _containers.length,
+                      itemBuilder: (context, index) {
+                        final c = _containers[index];
+                        return Card(
+                          color: const Color(0xFF1E293B),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(color: Color(0xFF334155)),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            leading: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF334155),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                _getTypeIcon(c.containerType),
+                                color: const Color(0xFF6366F1),
+                                size: 24,
+                              ),
+                            ),
+                            title: Text(
+                              c.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${c.weightDisplayLbs} capacity  |  Qty: ${c.quantity}',
+                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                ),
+                                if (c.description != null && c.description!.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    c.description!,
+                                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                            trailing: PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, color: Color(0xFF64748B)),
+                              color: const Color(0xFF334155),
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showContainerForm(existing: c);
+                                } else if (value == 'delete') {
+                                  _deleteContainer(c);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Edit', style: TextStyle(color: Colors.white)),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
     );
   }
 }
