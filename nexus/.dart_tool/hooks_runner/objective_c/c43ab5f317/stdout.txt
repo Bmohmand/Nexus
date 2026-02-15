@@ -1,0 +1,58 @@
+Running `(cd /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/; ANDROID_HOME=/Users/noahsabbavarapu/Library/Android/sdk TMPDIR=/var/folders/yg/x9hyhnpj13sfxh9f6kvq2r7h0000gn/T/ PATH=/Applications/Xcode.app/Contents/SharedFrameworks/SwiftBuild.framework/Versions/A/PlugIns/SWBBuildService.bundle/Contents/PlugIns/SWBUniversalPlatformPlugin.bundle/Contents/Frameworks/SWBUniversalPlatform.framework/Resources:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/local/bin:/Applications/Xcode.app/Contents/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/usr/local/bin:/opt/miniconda3/bin:/opt/miniconda3/condabin:/Users/noahsabbavarapu/.supabase/bin:/opt/homebrew/opt/ruby/bin:/opt/homebrew/opt/libpq/bin:/Library/Frameworks/Python.framework/Versions/3.13/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Users/noahsabbavarapu/Development/flutter/bin HOME=/Users/noahsabbavarapu /Users/noahsabbavarapu/Development/flutter/bin/cache/dart-sdk/bin/dart --packages=/Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/package_config.json /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/objective_c/c43ab5f317/hook.dill --config=/Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/objective_c/c43ab5f317/input.json )`.
+INFO: 2026-02-14 17:59:50.431120: Running `/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang --version`.
+
+INFO: 2026-02-14 17:59:50.447351: Running `/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang --version`.
+
+INFO: 2026-02-14 17:59:50.461839: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 -c /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/include/dart_api_dl.c -fpic -I src -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/include/dart_api_dl.c.o
+
+INFO: 2026-02-14 17:59:50.462171: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 -c /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/objective_c.c -fpic -I src -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c.c.o
+
+INFO: 2026-02-14 17:59:50.462298: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 -x objective-c -fobjc-arc -c /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/input_stream_adapter.m -fpic -I src -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/input_stream_adapter.m.o
+
+INFO: 2026-02-14 17:59:50.462399: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 -x objective-c -fobjc-arc -c /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/objective_c.m -fpic -I src -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c.m.o
+
+INFO: 2026-02-14 17:59:50.462497: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 -x objective-c -fobjc-arc -c /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/observer.m -fpic -I src -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/observer.m.o
+
+INFO: 2026-02-14 17:59:50.462666: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 -x objective-c -fobjc-arc -c /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/ns_number.m -fpic -I src -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/ns_number.m.o
+
+INFO: 2026-02-14 17:59:50.462890: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 -x objective-c -fobjc-arc -c /Users/noahsabbavarapu/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/objective_c_bindings_generated.m -fpic -I src -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c_bindings_generated.m.o
+
+INFO: 2026-02-14 17:59:50.505044: 
+INFO: 2026-02-14 17:59:50.505169: 
+INFO: 2026-02-14 17:59:50.505196: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/include/dart_api_dl.c.o
+
+INFO: 2026-02-14 17:59:50.508310: 
+INFO: 2026-02-14 17:59:50.508352: 
+INFO: 2026-02-14 17:59:50.508373: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c.c.o
+
+INFO: 2026-02-14 17:59:50.523380: 
+INFO: 2026-02-14 17:59:50.523456: 
+INFO: 2026-02-14 17:59:50.523480: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/observer.m.o
+
+INFO: 2026-02-14 17:59:50.529073: 
+INFO: 2026-02-14 17:59:50.529108: 
+INFO: 2026-02-14 17:59:50.529120: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/protocol.m.o
+
+INFO: 2026-02-14 17:59:50.603076: 
+INFO: 2026-02-14 17:59:50.603115: 
+INFO: 2026-02-14 17:59:50.603125: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/ns_number.m.o
+
+INFO: 2026-02-14 17:59:50.605445: 
+INFO: 2026-02-14 17:59:50.605474: 
+INFO: 2026-02-14 17:59:50.605484: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c.m.o
+
+INFO: 2026-02-14 17:59:50.607829: 
+INFO: 2026-02-14 17:59:50.607852: 
+INFO: 2026-02-14 17:59:50.607861: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/input_stream_adapter.m.o
+
+INFO: 2026-02-14 17:59:50.625827: 
+INFO: 2026-02-14 17:59:50.625865: 
+INFO: 2026-02-14 17:59:50.625874: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c_bindings_generated.m.o
+
+INFO: 2026-02-14 17:59:50.626262: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -shared -Wl,-encryptable -undefined dynamic_lookup -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios -mios-version-min=13 /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/include/dart_api_dl.c.o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c.c.o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/input_stream_adapter.m.o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c.m.o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/observer.m.o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/ns_number.m.o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/protocol.m.o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/obj/src/objective_c_bindings_generated.m.o -o /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/objective_c.dylib
+
+INFO: 2026-02-14 17:59:50.650723: 
+INFO: 2026-02-14 17:59:50.650789: ld: warning: -undefined dynamic_lookup is deprecated on iOS
+
+INFO: 2026-02-14 17:59:50.650804: Generated /Users/noahsabbavarapu/dev/GitHub/FitCheck/nexus/.dart_tool/hooks_runner/shared/objective_c/build/c43ab5f317/objective_c.dylib
+
