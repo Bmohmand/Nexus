@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+<string>Nexus needs camera access to scan and catalog your physical items</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Nexus needs photo library access to select images of your items</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>Nexus needs microphone access for video recording features</string>
 </dict>
 </plist>
