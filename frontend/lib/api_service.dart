@@ -1,48 +1,50 @@
 import 'dart:convert';
 import 'dart:io'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'supabase_config.dart';
 
 class NexusApiService {
   // Supabase client headers
   static Map<String, String> get _supabaseHeaders => {
-        'apikey': SupabaseConfig.supabaseAnonKey,
-        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+        'apikey': dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+        'Authorization': 'Bearer ${dotenv.env['SUPABASE_ANON_KEY'] ?? ''}',
         'Content-Type': 'application/json',
       };
 
   // Your FastAPI backend URL
-  static const String backendUrl = 'http://10.27.98.162:8000';
+  static String get backendUrl => dotenv.env['API_BASE_URL'] ?? 'http://10.27.98.162:8000';
 
-  /// Upload image to backend for ingestion (sends image URL)
+  /// Upload image to backend for ingestion
   /// POST /api/v1/ingest
-  static Future<Map<String, dynamic>?> ingestImage({
-    required String imageUrl,
-    String? userId,
-  }) async {
-    try {
-      final uri = Uri.parse('$backendUrl/api/v1/ingest');
-      
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'image_url': imageUrl,
-          if (userId != null) 'user_id': userId,
-        }),
-      );
+  /// Upload image to backend for ingestion
+/// POST /api/v1/ingest (expects JSON with image_url)
+static Future<Map<String, dynamic>?> ingestImage({
+  required String imageUrl,  // Changed from imagePath to imageUrl
+  String? userId,
+}) async {
+  try {
+    final uri = Uri.parse('$backendUrl/api/v1/ingest');
+    
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'image_url': imageUrl,  // Send URL, not file
+        if (userId != null) 'user_id': userId,
+      }),
+    );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        print('Error ingesting image: ${response.statusCode} - ${response.body}');
-        return null;
-      }
-    } catch (e) {
-      print('Exception during image ingest: $e');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      print('Error ingesting image: ${response.statusCode} - ${response.body}');
       return null;
     }
+  } catch (e) {
+    print('Exception during image ingest: $e');
+    return null;
   }
+}
 
   /// Perform semantic search
   /// POST /api/v1/search
@@ -64,7 +66,7 @@ class NexusApiService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return List<Map<String, dynamic>>.from(data['results'] ?? []);
+        return List<Map<String, dynamic>>.from(data['selected_items'] ?? data['raw_results']);
       } else {
         print('Error performing search: ${response.statusCode}');
         return null;
@@ -81,7 +83,7 @@ class NexusApiService {
   }) async {
     try {
       final uri = Uri.parse(
-        '${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?user_id=eq.$userId&select=*',
+        '${dotenv.env['SUPABASE_URL']}/rest/v1/manifest_items?user_id=eq.$userId&select=*',
       );
 
       final response = await http.get(uri, headers: _supabaseHeaders);
@@ -105,7 +107,7 @@ class NexusApiService {
     required Map<String, dynamic> metadata,
   }) async {
     try {
-      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items');
+      final uri = Uri.parse('${dotenv.env['SUPABASE_URL']}/rest/v1/manifest_items');
 
       final response = await http.post(
         uri,
@@ -140,7 +142,7 @@ class NexusApiService {
   /// Supabase health check
   static Future<bool> supabaseHealthCheck() async {
     try {
-      final uri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?select=id&limit=1');
+      final uri = Uri.parse('${dotenv.env['SUPABASE_URL']}/rest/v1/manifest_items?select=id&limit=1');
       final response = await http
           .get(uri, headers: _supabaseHeaders)
           .timeout(const Duration(seconds: 5));
@@ -152,54 +154,34 @@ class NexusApiService {
   }
 
   /// Upload image to Supabase Storage and return public URL
-  static Future<String?> uploadImageToStorage(String imagePath) async {
-    try {
-      final file = File(imagePath);
-      final bytes = await file.readAsBytes();
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.supabaseUrl}/storage/v1/object/manifest-assets/$fileName'),
-        headers: {
-          'apikey': SupabaseConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
-          'Content-Type': 'image/jpeg',
-        },
-        body: bytes,
-      );
+  /// Upload image to Supabase Storage and return public URL
+static Future<String?> uploadImageToStorage(String imagePath) async {
+  try {
+    final file = File(imagePath);
+    final bytes = await file.readAsBytes();
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    
+    final response = await http.post(
+      Uri.parse('${dotenv.env['SUPABASE_URL']}/storage/v1/object/manifest-assets/$fileName'),
+      headers: {
+        'apikey': dotenv.env['SUPABASE_ANON_KEY'] ?? '',  // ADD THIS LINE
+        'Authorization': 'Bearer ${dotenv.env['SUPABASE_ANON_KEY'] ?? ''}',
+        'Content-Type': 'image/jpeg',
+      },
+      body: bytes,
+    );
 
-      print('Upload response: ${response.statusCode} - ${response.body}');
+    print('Upload response: ${response.statusCode} - ${response.body}');  // ADD DEBUG
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/manifest-assets/$fileName';
-      } else {
-        print('Error uploading to storage: ${response.statusCode} - ${response.body}');
-        return null;
-      }
-    } catch (e) {
-      print('Exception uploading image: $e');
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return '${dotenv.env['SUPABASE_URL']}/storage/v1/object/public/manifest-assets/$fileName';
+    } else {
+      print('Error uploading to storage: ${response.statusCode} - ${response.body}');
       return null;
     }
+  } catch (e) {
+    print('Exception uploading image: $e');
+    return null;
   }
-
-  /// Get all items from manifest_items table
-  static Future<List<Map<String, dynamic>>?> getManifestItems() async {
-    try {
-      final uri = Uri.parse(
-        '${SupabaseConfig.supabaseUrl}/rest/v1/manifest_items?select=*&order=created_at.desc',
-      );
-
-      final response = await http.get(uri, headers: _supabaseHeaders);
-
-      if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(json.decode(response.body));
-      } else {
-        print('Error fetching manifest items: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('Exception fetching manifest items: $e');
-      return null;
-    }
-  }
+}
 }
