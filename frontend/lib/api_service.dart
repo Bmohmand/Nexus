@@ -66,7 +66,7 @@ static Future<Map<String, dynamic>?> ingestImage({
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return List<Map<String, dynamic>>.from(data['results'] ?? []);
+        return List<Map<String, dynamic>>.from(data['selected_items'] ?? data['raw_results']);
       } else {
         print('Error performing search: ${response.statusCode}');
         return null;

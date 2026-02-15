@@ -530,7 +530,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     style: const TextStyle(color: Color(0xFF94A3B8)),
                   ),
                   trailing: Text(
-                    '${((item['similarity'] ?? 0) * 100).toStringAsFixed(0)}%',
+                    '${((item['score'] ?? 0) * 100).toStringAsFixed(0)}%',
                     style: const TextStyle(color: Color(0xFF6366F1)),
                   ),
                 ),
