@@ -6,6 +6,7 @@ import 'api_service.dart';
 import 'models/storage_container.dart';
 import 'package:vector_math/vector_math_64.dart' as vm;
 import 'dart:math' as math;
+import 'dart:convert'; // Add this for json.decode
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1684,82 +1685,136 @@ class _GraphVisualizationViewState extends State<GraphVisualizationView> {
   }
 
   Future<void> _loadGraphData() async {
-    try {
+  try {
+    setState(() {
+      _statusMessage = 'Fetching items from database...';
+    });
+
+    // Fetch items with embeddings
+    final items = await NexusApiService.getManifestItems();
+    
+    print('DEBUG: Fetched ${items?.length ?? 0} total items');
+    
+    if (items == null || items.isEmpty) {
       setState(() {
-        _statusMessage = 'Fetching items from database...';
-      });
-
-      // Fetch items with embeddings
-      final items = await NexusApiService.getManifestItems();
-      
-      if (items == null || items.isEmpty) {
-        setState(() {
-          _statusMessage = 'No items found';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // Filter items with embeddings
-      final itemsWithEmbeddings = items.where((item) {
-        final embedding = item['embedding'];
-        return embedding != null && embedding is List && embedding.isNotEmpty;
-      }).toList();
-
-      if (itemsWithEmbeddings.isEmpty) {
-        setState(() {
-          _statusMessage = 'No items with embeddings found';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      setState(() {
-        _statusMessage = 'Reducing ${itemsWithEmbeddings.length} embeddings to 3D...';
-      });
-
-      // Extract embeddings as List<List<double>>
-      final embeddings = itemsWithEmbeddings.map((item) {
-        final embedding = item['embedding'] as List;
-        return embedding.map((e) => (e as num).toDouble()).toList();
-      }).toList();
-
-      // Perform PCA to reduce to 3D
-      final positions3D = _performPCA(embeddings, 3);
-
-      // Create graph nodes
-      final nodes = <GraphNode>[];
-      for (int i = 0; i < itemsWithEmbeddings.length; i++) {
-        final item = itemsWithEmbeddings[i];
-        final category = (item['category'] ?? item['domain'] ?? 'misc').toString().toLowerCase();
-        
-        nodes.add(GraphNode(
-          id: item['id']?.toString() ?? i.toString(),
-          name: item['name']?.toString() ?? 'Unknown Item',
-          category: category,
-          position: vm.Vector3(
-            positions3D[i][0],
-            positions3D[i][1],
-            positions3D[i][2],
-          ),
-          color: _getCategoryColor(category),
-        ));
-      }
-
-      setState(() {
-        _nodes = nodes;
-        _isLoading = false;
-        _statusMessage = '';
-      });
-
-    } catch (e) {
-      setState(() {
-        _statusMessage = 'Error: $e';
+        _statusMessage = 'No items found in database';
         _isLoading = false;
       });
-      print('Error loading graph data: $e');
+      return;
     }
+
+    // Debug: Print first item to see structure
+    if (items.isNotEmpty) {
+      print('DEBUG: First item keys: ${items[0].keys.toList()}');
+      print('DEBUG: First item embedding type: ${items[0]['embedding']?.runtimeType}');
+      if (items[0]['embedding'] != null) {
+        final emb = items[0]['embedding'];
+        if (emb is List) {
+          print('DEBUG: Embedding length: ${emb.length}');
+          print('DEBUG: First few values: ${emb.take(5)}');
+        }
+      }
+    }
+
+    // Filter items with embeddings
+    // Filter items with embeddings and parse them
+final itemsWithEmbeddings = items.where((item) {
+  final embedding = item['embedding'];
+  return embedding != null && embedding.toString().isNotEmpty && embedding.toString() != 'null';
+}).toList();
+
+print('DEBUG: ${itemsWithEmbeddings.length} items have embedding data');
+
+if (itemsWithEmbeddings.isEmpty) {
+  setState(() {
+    _statusMessage = 'No items with embeddings found. Please scan items with the camera first.';
+    _isLoading = false;
+  });
+  return;
+}
+
+setState(() {
+  _statusMessage = 'Parsing and reducing ${itemsWithEmbeddings.length} embeddings to 3D...';
+});
+
+// Parse embeddings from JSON strings to List<double>
+final embeddings = <List<double>>[];
+final validItems = <Map<String, dynamic>>[];
+
+for (final item in itemsWithEmbeddings) {
+  try {
+    final embeddingStr = item['embedding'].toString();
+    
+    // Parse the JSON string to get the array
+    final parsed = json.decode(embeddingStr);
+    
+    if (parsed is List && parsed.isNotEmpty) {
+      final embedding = parsed.map((e) => (e as num).toDouble()).toList();
+      embeddings.add(embedding);
+      validItems.add(item);
+      
+      if (validItems.length == 1) {
+        print('DEBUG: Successfully parsed first embedding with ${embedding.length} dimensions');
+      }
+    }
+  } catch (e) {
+    print('DEBUG: Failed to parse embedding for item ${item['name']}: $e');
   }
+}
+
+print('DEBUG: Successfully parsed ${embeddings.length} embeddings');
+
+if (embeddings.isEmpty) {
+  setState(() {
+    _statusMessage = 'Failed to parse embeddings';
+    _isLoading = false;
+  });
+  return;
+}
+
+    print('DEBUG: Processing ${embeddings.length} embeddings');
+
+    // Perform PCA to reduce to 3D
+    final positions3D = _performPCA(embeddings, 3);
+
+    print('DEBUG: Generated ${positions3D.length} 3D positions');
+
+    // Create graph nodes
+    final nodes = <GraphNode>[];
+    for (int i = 0; i < validItems.length; i++) {
+      final item = validItems[i];
+      final category = (item['category'] ?? item['domain'] ?? 'misc').toString().toLowerCase();
+      
+      nodes.add(GraphNode(
+        id: item['id']?.toString() ?? i.toString(),
+        name: item['name']?.toString() ?? 'Unknown Item',
+        category: category,
+        position: vm.Vector3(
+          positions3D[i][0],
+          positions3D[i][1],
+          positions3D[i][2],
+        ),
+        color: _getCategoryColor(category),
+      ));
+    }
+
+    print('DEBUG: Created ${nodes.length} graph nodes');
+
+    setState(() {
+      _nodes = nodes;
+      _isLoading = false;
+      _statusMessage = '';
+    });
+
+  } catch (e, stackTrace) {
+    print('DEBUG: Error loading graph data: $e');
+    print('DEBUG: Stack trace: $stackTrace');
+    setState(() {
+      _statusMessage = 'Error: $e';
+      _isLoading = false;
+    });
+  }
+}
 
   // Simple PCA implementation
   List<List<double>> _performPCA(List<List<double>> embeddings, int targetDim) {
@@ -1792,7 +1847,7 @@ class _GraphVisualizationViewState extends State<GraphVisualizationView> {
       final y = emb.sublist(third, third * 2).reduce((a, b) => a + b) / third;
       final z = emb.sublist(third * 2).reduce((a, b) => a + b) / (d - third * 2);
       
-      positions.add([x * 50, y * 50, z * 50]);
+      positions.add([x * 15000, y * 15000, z * 15000]);
     }
 
     return positions;
@@ -1859,45 +1914,39 @@ class _GraphVisualizationViewState extends State<GraphVisualizationView> {
                 ),
                 
                 // Legend
-                Positioned(
-                  top: 20,
-                  left: 20,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF334155)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Semantic Graph',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${_nodes.length} items in vector space',
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildLegendItem('Clothing', const Color(0xFF6366F1)),
-                        _buildLegendItem('Medical', const Color(0xFFEF4444)),
-                        _buildLegendItem('Survival', const Color(0xFF10B981)),
-                        _buildLegendItem('Tech', const Color(0xFF8B5CF6)),
-                        _buildLegendItem('Food', const Color(0xFFF59E0B)),
-                      ],
-                    ),
-                  ),
-                ),
+                // Legend (smaller and more compact)
+Positioned(
+  top: 20,
+  left: 20,
+  child: Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1E293B).withOpacity(0.9),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFF334155)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${_nodes.length} items',
+          style: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildLegendItem('Clothing', const Color(0xFF6366F1)),
+        _buildLegendItem('Medical', const Color(0xFFEF4444)),
+        _buildLegendItem('Survival', const Color(0xFF10B981)),
+        _buildLegendItem('Tech', const Color(0xFF8B5CF6)),
+        _buildLegendItem('Food', const Color(0xFFF59E0B)),
+      ],
+    ),
+  ),
+),
                 
                 // Hint
                 Positioned(
@@ -1928,13 +1977,13 @@ class _GraphVisualizationViewState extends State<GraphVisualizationView> {
 
   Widget _buildLegendItem(String label, Color color) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
@@ -1946,12 +1995,12 @@ class _GraphVisualizationViewState extends State<GraphVisualizationView> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 11,
             ),
           ),
         ],
