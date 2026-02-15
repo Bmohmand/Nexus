@@ -316,6 +316,20 @@ static Future<Map<String, dynamic>?> ingestImage({
     }
   }
 
+  /// Delete an item from the manifest
+  /// DELETE /api/v1/items/{id}
+  static Future<bool> deleteItem({required String itemId}) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$backendUrl/api/v1/items/$itemId'),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Exception deleting item: $e');
+      return false;
+    }
+  }
+
   /// Delete a storage container
   /// DELETE /api/v1/containers/{id}
   static Future<bool> deleteContainer({required String containerId}) async {

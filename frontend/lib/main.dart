@@ -1082,15 +1082,18 @@ class _ItemsGridViewState extends State<ItemsGridView> {
   final name = item['name'] as String? ?? 'Unknown Item';
   final category = item['category'] as String? ?? 'misc';
 
-  return GestureDetector(  // ADD THIS
-    onTap: () {  // ADD THIS
-      Navigator.push(  // ADD THIS
-        context,  // ADD THIS
-        MaterialPageRoute(  // ADD THIS
-          builder: (context) => ItemDetailPage(item: item),  // ADD THIS
-        ),  // ADD THIS
-      );  // ADD THIS
-    },  // ADD THIS
+  return GestureDetector(
+    onTap: () async {
+      final deleted = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ItemDetailPage(item: item),
+        ),
+      );
+      if (deleted == true) {
+        _fetchItems();
+      }
+    },
     child: Container(  // CHANGE: was just "Container(" before
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
@@ -2550,6 +2553,13 @@ class ItemDetailPage extends StatelessWidget {
           'Item Details',
           style: TextStyle(color: Colors.white),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+            tooltip: 'Delete Item',
+            onPressed: () => _confirmDelete(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -2652,6 +2662,54 @@ _buildSection('', [
         ),
       ),
     );
+  }
+
+  void _confirmDelete(BuildContext context) async {
+    final name = item['name'] as String? ?? 'this item';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Delete Item?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Remove "$name"? This cannot be undone.',
+          style: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final itemId = item['id'] as String?;
+      if (itemId != null) {
+        final success = await NexusApiService.deleteItem(itemId: itemId);
+        if (success && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"$name" deleted'),
+              backgroundColor: const Color(0xFF1E293B),
+            ),
+          );
+          Navigator.pop(context, true); // Signal deletion to parent
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to delete item'),
+              backgroundColor: Color(0xFFEF4444),
+            ),
+          );
+        }
+      }
+    }
   }
 
   bool _hasSpecifications() {
