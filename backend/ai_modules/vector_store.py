@@ -25,6 +25,14 @@ logger = logging.getLogger("manifest.vectorstore")
 TABLE_NAME = "manifest_items"
 RPC_NAME = "match_manifest_items"
 
+# Same mapping as knapsack_optimizer.WEIGHT_ESTIMATES_GRAMS for populating weight_grams on ingest
+_WEIGHT_ESTIMATE_TO_GRAMS = {
+    "ultralight": 100,
+    "light": 300,
+    "medium": 700,
+    "heavy": 1500,
+}
+
 
 class SupabaseVectorStore:
     """
@@ -62,6 +70,12 @@ class SupabaseVectorStore:
             The item's UUID
         """
         ctx = result.context
+        weight_grams = None
+        if ctx.weight_estimate:
+            weight_grams = _WEIGHT_ESTIMATE_TO_GRAMS.get(
+                ctx.weight_estimate.strip().lower(),
+                500,
+            )
         row = {
             "id": result.item_id,
             "embedding": result.vector,
@@ -71,6 +85,7 @@ class SupabaseVectorStore:
             "category": ctx.inferred_category,
             "primary_material": ctx.primary_material,
             "weight_estimate": ctx.weight_estimate,
+            "weight_grams": weight_grams,
             "thermal_rating": ctx.thermal_rating,
             "water_resistance": ctx.water_resistance,
             "medical_application": ctx.medical_application,
@@ -91,6 +106,7 @@ class SupabaseVectorStore:
         query_vector: list[float],
         top_k: int = 15,
         category_filter: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> list[RetrievedItem]:
         """
         Perform cosine similarity search via the match_manifest_items RPC function.
@@ -99,6 +115,7 @@ class SupabaseVectorStore:
             query_vector: The embedded query
             top_k: Number of nearest neighbors to return
             category_filter: Optional category to restrict search
+            user_id: Optional user UUID to scope search to a specific user's items
 
         Returns:
             List of RetrievedItem sorted by similarity (highest first)
@@ -109,6 +126,7 @@ class SupabaseVectorStore:
                 "query_embedding": query_vector,
                 "match_count": top_k,
                 "filter_category": category_filter,
+                "filter_user_id": user_id,
             },
         ).execute()
 
@@ -118,6 +136,7 @@ class SupabaseVectorStore:
                 item_id=str(row["id"]),
                 score=float(row["similarity"]),
                 image_url=row.get("image_url"),
+                weight_grams=row.get("weight_grams"),
                 context=ItemContext(
                     name=row["name"],
                     inferred_category=row.get("category", "misc"),

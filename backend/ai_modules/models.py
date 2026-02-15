@@ -52,6 +52,7 @@ class RetrievedItem(BaseModel):
     item_id: str
     score: float = Field(description="Cosine similarity score (0-1)")
     image_url: Optional[str] = None
+    weight_grams: Optional[float] = None  # From DB when present; else optimizer estimates from weight_estimate
     context: ItemContext
 
 

@@ -1,18 +1,16 @@
 import 'dart:convert';
-import 'dart:io'; 
+import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import 'core/constants.dart';
+
 class NexusApiService {
-  // Supabase client headers
   static Map<String, String> get _supabaseHeaders => {
         'apikey': dotenv.env['SUPABASE_ANON_KEY'] ?? '',
         'Authorization': 'Bearer ${dotenv.env['SUPABASE_ANON_KEY'] ?? ''}',
         'Content-Type': 'application/json',
       };
-
-  // Your FastAPI backend URL
-  static String get backendUrl => dotenv.env['API_BASE_URL'] ?? 'http://10.27.98.162:8000';
 
   /// Upload image to backend for ingestion
   /// POST /api/v1/ingest
@@ -23,7 +21,7 @@ static Future<Map<String, dynamic>?> ingestImage({
   String? userId,
 }) async {
   try {
-    final uri = Uri.parse('$backendUrl/api/v1/ingest');
+    final uri = Uri.parse('$apiBaseUrl/api/v1/ingest');
     
     final response = await http.post(
       uri,
@@ -48,12 +46,17 @@ static Future<Map<String, dynamic>?> ingestImage({
 
   /// Perform semantic search
   /// POST /api/v1/search
+  /// When synthesize=false (default), returns raw vector search results ranked
+  /// by similarity — fast and never filtered to empty by the LLM.
+  /// When synthesize=true, the backend runs an LLM to curate results into a
+  /// mission plan (slower, may filter items out).
   static Future<List<Map<String, dynamic>>?> semanticSearch({
     required String query,
     int topK = 10,
+    bool synthesize = false,
   }) async {
     try {
-      final uri = Uri.parse('$backendUrl/api/v1/search');
+      final uri = Uri.parse('$apiBaseUrl/api/v1/search');
       
       final response = await http.post(
         uri,
@@ -61,18 +64,67 @@ static Future<Map<String, dynamic>?> ingestImage({
         body: json.encode({
           'query': query,
           'top_k': topK,
+          'synthesize': synthesize,
         }),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return List<Map<String, dynamic>>.from(data['selected_items'] ?? data['raw_results']);
+        print('Search response keys: ${data.keys.toList()}');
+
+        // When synthesize=true, results are in selected_items.
+        // When synthesize=false, results are in raw_results.
+        // Prefer selected_items if it's non-empty, otherwise fall back to raw_results.
+        final selected = data['selected_items'] as List<dynamic>?;
+        final raw = data['raw_results'] as List<dynamic>?;
+
+        final items = (selected != null && selected.isNotEmpty)
+            ? selected
+            : (raw ?? []);
+
+        return List<Map<String, dynamic>>.from(items);
       } else {
-        print('Error performing search: ${response.statusCode}');
+        print('Error performing search: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
       print('Exception during semantic search: $e');
+      return null;
+    }
+  }
+
+  /// Fetch all items from the backend (which reads from Supabase).
+  /// GET /api/v1/items — returns { items: [...], count: int }
+  static Future<Map<String, dynamic>?> getItems({
+    int limit = 50,
+    int offset = 0,
+    String? domain,
+    String? userId,
+  }) async {
+    try {
+      final params = <String, String>{
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+      };
+      if (domain != null) params['domain'] = domain;
+      if (userId != null) params['user_id'] = userId;
+
+      final uri = Uri.parse('$apiBaseUrl/api/v1/items')
+          .replace(queryParameters: params);
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(json.decode(response.body));
+      } else {
+        print('Error fetching items: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Exception fetching items: $e');
       return null;
     }
   }
@@ -127,10 +179,45 @@ static Future<Map<String, dynamic>?> ingestImage({
     }
   }
 
+  /// Weight-limited pack recommendation
+  /// POST /api/v1/pack — returns subset of items that fit within max weight and maximize relevance
+  static Future<Map<String, dynamic>?> packRecommendation({
+    required String query,
+    required double maxWeightKg,
+    int topK = 50,
+    Map<String, int>? categoryMinimums,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiBaseUrl/api/v1/pack');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'query': query,
+          'top_k': topK,
+          'constraints': {
+            'max_weight_grams': maxWeightKg * 1000,
+            'category_minimums': categoryMinimums ?? {},
+            'tag_minimums': {},
+            'max_per_item': null,
+          },
+        }),
+      );
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(json.decode(response.body));
+      }
+      print('Pack API error: ${response.statusCode} - ${response.body}');
+      return null;
+    } catch (e) {
+      print('Exception during pack recommendation: $e');
+      return null;
+    }
+  }
+
   /// Health check - verify backend is running
   static Future<bool> healthCheck() async {
     try {
-      final uri = Uri.parse('$backendUrl/health');
+      final uri = Uri.parse('$apiBaseUrl/health');
       final response = await http.get(uri).timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (e) {

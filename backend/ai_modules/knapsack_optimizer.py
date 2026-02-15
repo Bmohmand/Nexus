@@ -271,10 +271,13 @@ class KnapsackOptimizer:
             else:
                 relaxed.append(f"Pinned item {pinned_id} not found in candidates")
 
-        # ----- Objective: Maximize total similarity score -----
-        # Scale similarity scores to integers (multiply by 10000)
+        # ----- Objective: Maximize total similarity score; favor more items when similar -----
+        # Small per-item bonus (epsilon) so that under the same weight cap, more items can beat fewer
         SCORE_SCALE = 10000
-        scaled_scores = [int(item.similarity_score * SCORE_SCALE) for item in items]
+        EPSILON = 0.001  # Relevance still dominates; count breaks ties
+        scaled_scores = [
+            int((item.similarity_score + EPSILON) * SCORE_SCALE) for item in items
+        ]
         model.Maximize(
             sum(x[i] * scaled_scores[i] for i in range(len(items)))
         )
@@ -357,8 +360,8 @@ class KnapsackOptimizer:
         packable = []
         for item in items:
             weight = (
-                weight_overrides.get(item.item_id, None)
-                if weight_overrides else None
+                (weight_overrides.get(item.item_id) if weight_overrides else None)
+                or getattr(item, "weight_grams", None)
             ) or estimate_weight(item)
             
             qty = (
